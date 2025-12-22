@@ -31,12 +31,12 @@
             <div v-for="score in poScores" :key="score.po_code" class="score-item">
               <div class="score-header">
                 <span class="po-label">{{ score.po_code }}</span>
-                <span class="score-value" :class="getScoreClass(score.score)">
+                <span class="score-value" :style="{ color: getScoreColor(score.score) }">
                   {{ score.score.toFixed(2) }}%
                 </span>
               </div>
               <div class="score-bar">
-                <div class="score-fill" :style="{ width: score.score + '%' }"></div>
+                <div class="score-fill" :style="{ width: score.score + '%', background: getScoreColor(score.score) }"></div>
               </div>
             </div>
           </div>
@@ -140,6 +140,34 @@ function getScoreClass(score) {
   if (score >= 60) return 'score-good'
   if (score >= 40) return 'score-fair'
   return 'score-poor'
+}
+
+function getScoreColor(score) {
+  // Clamp score between 0 and 100
+  const s = Math.max(0, Math.min(100, score))
+  
+  // Red to Yellow to Green gradient
+  // 0% = Red (255, 0, 0)
+  // 50% = Yellow (255, 200, 0)
+  // 100% = Green (16, 185, 129)
+  
+  let r, g, b
+  
+  if (s <= 50) {
+    // Red to Yellow (0-50%)
+    const ratio = s / 50
+    r = 255
+    g = Math.round(ratio * 200)
+    b = 0
+  } else {
+    // Yellow to Green (50-100%)
+    const ratio = (s - 50) / 50
+    r = Math.round(255 - ratio * (255 - 16))
+    g = Math.round(200 + ratio * (185 - 200))
+    b = Math.round(ratio * 129)
+  }
+  
+  return `rgb(${r}, ${g}, ${b})`
 }
 
 onMounted(() => {
@@ -323,8 +351,7 @@ onMounted(() => {
 
 .score-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-  transition: width 0.3s ease;
+  transition: width 0.3s ease, background 0.3s ease;
   border-radius: 4px;
 }
 

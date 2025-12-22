@@ -1,37 +1,165 @@
 <template>
   <div class="courses-view">
-    <div class="view-header">
-      <div class="header-left">
-        <h2>Courses</h2>
-        <p class="subtitle">Manage courses and their learning outcomes</p>
+    <!-- Hero Section -->
+    <div class="hero-section">
+      <div class="hero-content">
+        <div class="hero-text">
+          <h1>📚 Course Management</h1>
+          <p>Create, manage, and track your courses with learning outcomes and assessments</p>
+        </div>
+        <button @click="showAddModal = true" class="btn-add">
+          + Add New Course
+        </button>
       </div>
-      <button @click="showAddModal = true" class="btn-primary">
-        <span class="icon">+</span> Add New Course
+      
+      <!-- Stats Cards -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-icon">📖</div>
+          <div class="stat-info">
+            <div class="stat-value">{{ courses.length }}</div>
+            <div class="stat-label">Total Courses</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🎯</div>
+          <div class="stat-info">
+            <div class="stat-value">{{ totalLOs }}</div>
+            <div class="stat-label">Learning Outcomes</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📝</div>
+          <div class="stat-info">
+            <div class="stat-value">{{ totalAssessments }}</div>
+            <div class="stat-label">Assessments</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🔗</div>
+          <div class="stat-info">
+            <div class="stat-value">{{ totalMappings }}</div>
+            <div class="stat-label">LO-PO Mappings</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search and Filter -->
+    <div class="toolbar">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input 
+          v-model="searchQuery" 
+          type="text" 
+          placeholder="Search courses by code or name..."
+          class="search-input"
+        />
+      </div>
+      <div class="view-toggle">
+        <button 
+          :class="['toggle-btn', { active: viewMode === 'grid' }]"
+          @click="viewMode = 'grid'"
+        >
+          ▦ Grid
+        </button>
+        <button 
+          :class="['toggle-btn', { active: viewMode === 'list' }]"
+          @click="viewMode = 'list'"
+        >
+          ☰ List
+        </button>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div v-if="filteredCourses.length === 0 && !loading" class="empty-state">
+      <div class="empty-icon">📚</div>
+      <h3>No courses found</h3>
+      <p v-if="searchQuery">Try adjusting your search terms</p>
+      <p v-else>Get started by adding your first course</p>
+      <button v-if="!searchQuery" @click="showAddModal = true" class="btn-add">
+        + Add Your First Course
       </button>
     </div>
 
-    <div class="courses-grid">
-      <div v-for="course in courses" :key="course.id" class="course-card">
-        <div class="card-header">
-          <div class="course-code">{{ course.code }}</div>
-          <div class="course-actions">
-            <button @click="deleteCourse(course.id)" class="btn-icon" title="Delete Course">🗑️</button>
+    <!-- Courses Grid -->
+    <div v-else :class="['courses-container', viewMode]">
+      <div 
+        v-for="(course, index) in filteredCourses" 
+        :key="course.id" 
+        class="course-card"
+      >
+        <!-- Card Accent -->
+        <div class="card-accent" :style="{ background: getCardColor(index) }"></div>
+        
+        <!-- Card Content -->
+        <div class="card-body">
+          <div class="card-header">
+            <div class="course-badge" :style="{ background: getCardColor(index) }">
+              {{ course.code }}
+            </div>
+            <div class="card-actions">
+              <button @click="$emit('viewCourse', course.id)" class="action-btn" title="View Details">
+                👁️
+              </button>
+              <button @click="deleteCourse(course.id)" class="action-btn delete" title="Delete Course">
+                🗑️
+              </button>
+            </div>
+          </div>
+          
+          <h3 class="course-title">{{ course.name }}</h3>
+          
+          <div class="course-info">
+            <div class="info-item">
+              <span class="info-icon">📅</span>
+              <span>{{ course.semester || 'Not set' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-icon">🏛️</span>
+              <span>{{ course.department }}</span>
+            </div>
+          </div>
+
+          <!-- Course Stats -->
+          <div class="course-stats">
+            <div class="mini-stat">
+              <span class="mini-stat-value">{{ getCourseLoCount(course.id) }}</span>
+              <span class="mini-stat-label">LOs</span>
+            </div>
+            <div class="mini-stat">
+              <span class="mini-stat-value">{{ getCourseAssessmentCount(course.id) }}</span>
+              <span class="mini-stat-label">Assessments</span>
+            </div>
+            <div class="mini-stat">
+              <span class="mini-stat-value">{{ getCourseMappingCount(course.id) }}</span>
+              <span class="mini-stat-label">Mappings</span>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="progress-section">
+            <div class="progress-header">
+              <span class="progress-label">Setup Progress</span>
+              <span class="progress-value">{{ getCourseProgress(course.id) }}%</span>
+            </div>
+            <div class="progress-bar">
+              <div 
+                class="progress-fill" 
+                :style="{ 
+                  width: getCourseProgress(course.id) + '%',
+                  background: getProgressColor(getCourseProgress(course.id))
+                }"
+              ></div>
+            </div>
           </div>
         </div>
-        <h3 class="course-name">{{ course.name }}</h3>
-        <div class="course-meta">
-          <span class="meta-item">
-            <span class="icon">📅</span>
-            {{ course.semester || 'No semester' }}
-          </span>
-          <span class="meta-item">
-            <span class="icon">🏢</span>
-            {{ course.department }}
-          </span>
-        </div>
+
+        <!-- Card Footer -->
         <div class="card-footer">
-          <button @click="viewCourseDetails(course.id)" class="btn-secondary btn-sm">
-            View Details
+          <button @click="$emit('viewCourse', course.id)" class="btn-view-details">
+            View Details →
           </button>
         </div>
       </div>
@@ -41,29 +169,35 @@
     <div v-if="showAddModal" class="modal-overlay" @click="showAddModal = false">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h3>Add New Course</h3>
+          <h3>📚 Add New Course</h3>
           <button @click="showAddModal = false" class="btn-close">×</button>
         </div>
         <form @submit.prevent="addCourse" class="modal-body">
-          <div class="form-group">
-            <label>Course Code</label>
-            <input v-model="newCourse.code" type="text" placeholder="e.g., CSE311" required>
+          <div class="form-row">
+            <div class="form-group">
+              <label>🏷️ Course Code</label>
+              <input v-model="newCourse.code" type="text" placeholder="e.g., CSE311" required />
+            </div>
+            <div class="form-group">
+              <label>🏛️ Department</label>
+              <input v-model="newCourse.department" type="text" placeholder="e.g., CSE" />
+            </div>
           </div>
           <div class="form-group">
-            <label>Course Name</label>
-            <input v-model="newCourse.name" type="text" placeholder="e.g., Algorithms" required>
+            <label>📖 Course Name</label>
+            <input v-model="newCourse.name" type="text" placeholder="e.g., Software Engineering" required />
           </div>
           <div class="form-group">
-            <label>Semester</label>
-            <input v-model="newCourse.semester" type="text" placeholder="e.g., 2024-Fall">
-          </div>
-          <div class="form-group">
-            <label>Department</label>
-            <input v-model="newCourse.department" type="text" placeholder="e.g., CSE">
+            <label>📅 Semester</label>
+            <input v-model="newCourse.semester" type="text" placeholder="e.g., 2024-Fall" />
           </div>
           <div class="modal-footer">
-            <button type="button" @click="showAddModal = false" class="btn-secondary">Cancel</button>
-            <button type="submit" class="btn-primary">Create Course</button>
+            <button type="button" @click="showAddModal = false" class="btn-secondary">
+              Cancel
+            </button>
+            <button type="submit" class="btn-primary">
+              ✨ Create Course
+            </button>
           </div>
         </form>
       </div>
@@ -72,11 +206,20 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import api from '../services/api'
 
+const emit = defineEmits(['viewCourse'])
+
 const courses = ref([])
+const learningOutcomes = ref([])
+const assessments = ref([])
+const mappings = ref([])
+const loading = ref(true)
 const showAddModal = ref(false)
+const searchQuery = ref('')
+const viewMode = ref('grid')
+
 const newCourse = ref({
   code: '',
   name: '',
@@ -84,12 +227,84 @@ const newCourse = ref({
   department: 'CSE'
 })
 
-async function loadCourses() {
+// Computed properties
+const filteredCourses = computed(() => {
+  if (!searchQuery.value) return courses.value
+  const query = searchQuery.value.toLowerCase()
+  return courses.value.filter(c => 
+    c.code.toLowerCase().includes(query) || 
+    c.name.toLowerCase().includes(query)
+  )
+})
+
+const totalLOs = computed(() => learningOutcomes.value.length)
+const totalAssessments = computed(() => assessments.value.length)
+const totalMappings = computed(() => mappings.value.length)
+
+// Helper functions
+function getCourseLoCount(courseId) {
+  return learningOutcomes.value.filter(lo => lo.course === courseId).length
+}
+
+function getCourseAssessmentCount(courseId) {
+  return assessments.value.filter(a => a.course === courseId).length
+}
+
+function getCourseMappingCount(courseId) {
+  const courseLOs = learningOutcomes.value.filter(lo => lo.course === courseId).map(lo => lo.id)
+  return mappings.value.filter(m => courseLOs.includes(m.learning_outcome)).length
+}
+
+function getCourseProgress(courseId) {
+  const hasLOs = getCourseLoCount(courseId) > 0
+  const hasAssessments = getCourseAssessmentCount(courseId) > 0
+  const hasMappings = getCourseMappingCount(courseId) > 0
+  
+  let progress = 25
+  if (hasLOs) progress += 25
+  if (hasAssessments) progress += 25
+  if (hasMappings) progress += 25
+  
+  return progress
+}
+
+function getCardColor(index) {
+  const colors = [
+    'linear-gradient(135deg, #667eea, #764ba2)',
+    'linear-gradient(135deg, #f093fb, #f5576c)',
+    'linear-gradient(135deg, #4facfe, #00f2fe)',
+    'linear-gradient(135deg, #43e97b, #38f9d7)',
+    'linear-gradient(135deg, #fa709a, #fee140)',
+    'linear-gradient(135deg, #a8edea, #fed6e3)',
+  ]
+  return colors[index % colors.length]
+}
+
+function getProgressColor(progress) {
+  if (progress >= 100) return 'linear-gradient(90deg, #10b981, #34d399)'
+  if (progress >= 75) return 'linear-gradient(90deg, #3b82f6, #60a5fa)'
+  if (progress >= 50) return 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+  return 'linear-gradient(90deg, #ef4444, #f87171)'
+}
+
+// API functions
+async function loadData() {
+  loading.value = true
   try {
-    const response = await api.getCourses()
-    courses.value = response.data
+    const [coursesRes, losRes, assessRes, mappingsRes] = await Promise.all([
+      api.getCourses(),
+      api.getLearningOutcomes(),
+      api.getAssessments(),
+      api.getMappings()
+    ])
+    courses.value = coursesRes.data
+    learningOutcomes.value = losRes.data
+    assessments.value = assessRes.data
+    mappings.value = mappingsRes.data
   } catch (error) {
-    console.error('Error loading courses:', error)
+    console.error('Error loading data:', error)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -98,7 +313,7 @@ async function addCourse() {
     await api.createCourse(newCourse.value)
     showAddModal.value = false
     newCourse.value = { code: '', name: '', semester: '', department: 'CSE' }
-    await loadCourses()
+    await loadData()
   } catch (error) {
     console.error('Error adding course:', error)
     alert('Failed to add course')
@@ -106,25 +321,21 @@ async function addCourse() {
 }
 
 async function deleteCourse(id) {
-  if (!confirm('Are you sure you want to delete this course? This will delete all associated data (LOs, Assessments, etc.).')) {
+  if (!confirm('Are you sure you want to delete this course? This will delete all associated data.')) {
     return
   }
   
   try {
     await api.deleteCourse(id)
-    await loadCourses()
+    await loadData()
   } catch (error) {
     console.error('Error deleting course:', error)
     alert('Failed to delete course')
   }
 }
 
-function viewCourseDetails(id) {
-  console.log('View course:', id)
-}
-
 onMounted(() => {
-  loadCourses()
+  loadData()
 })
 </script>
 
@@ -132,145 +343,423 @@ onMounted(() => {
 .courses-view {
   max-width: 1400px;
   margin: 0 auto;
+  padding: 20px;
 }
 
-.view-header {
+/* Hero Section */
+.hero-section {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 20px;
+  padding: 32px;
+  margin-bottom: 28px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-section::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 60%;
+  height: 200%;
+  background: rgba(255, 255, 255, 0.1);
+  transform: rotate(25deg);
+  pointer-events: none;
+}
+
+.hero-content {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 32px;
+  align-items: center;
+  margin-bottom: 28px;
+  position: relative;
+  z-index: 1;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-.header-left h2 {
+.hero-text h1 {
   font-size: 32px;
   font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 8px;
+  margin: 0 0 8px 0;
 }
 
-.subtitle {
-  font-size: 16px;
-  color: var(--text-secondary);
+.hero-text p {
+  font-size: 15px;
+  opacity: 0.9;
+  margin: 0;
 }
 
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-  color: white;
-  padding: 12px 24px;
+.btn-add {
+  background: white;
+  color: #667eea;
+  padding: 14px 28px;
   border: none;
-  border-radius: 10px;
-  font-weight: 600;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 15px;
   cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.btn-add:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Stats Row */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 900px) {
+  .stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border-radius: 14px;
+  padding: 18px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  transition: all 0.2s;
-  box-shadow: var(--shadow-md);
+  gap: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
 }
 
-.btn-secondary {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  padding: 12px 24px;
-  border: 1px solid var(--border-color);
+.stat-info {
+  min-width: 0;
+}
+
+.stat-value {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 13px;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.search-box {
+  flex: 1;
+  max-width: 400px;
+  min-width: 200px;
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 16px 12px 44px;
+  border: 2px solid #e5e7eb;
   border-radius: 10px;
-  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s;
+  background: white;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+}
+
+.view-toggle {
+  display: flex;
+  background: #f3f4f6;
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.toggle-btn {
+  padding: 10px 18px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
   cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  color: #6b7280;
   transition: all 0.2s;
 }
 
-.btn-secondary:hover {
-  background: var(--bg-secondary);
-  border-color: var(--primary-color);
+.toggle-btn.active {
+  background: white;
+  color: #667eea;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-.btn-sm {
-  padding: 8px 16px;
-  font-size: 14px;
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 60px 30px;
+  background: white;
+  border-radius: 16px;
+  border: 2px dashed #e5e7eb;
 }
 
-.courses-grid {
+.empty-icon {
+  font-size: 56px;
+  margin-bottom: 16px;
+}
+
+.empty-state h3 {
+  font-size: 22px;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+}
+
+.empty-state p {
+  color: #6b7280;
+  margin: 0 0 20px 0;
+}
+
+/* Courses Container */
+.courses-container {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 24px;
 }
 
+.courses-container.grid {
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+}
+
+.courses-container.list {
+  grid-template-columns: 1fr;
+}
+
+/* Course Card */
 .course-card {
   background: white;
-  border: 1px solid var(--border-color);
   border-radius: 16px;
-  padding: 24px;
-  transition: all 0.3s;
-  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #f0f0f0;
 }
 
 .course-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--primary-color);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
+.card-accent {
+  height: 5px;
+  width: 100%;
+}
+
+.card-body {
+  padding: 22px;
+  flex: 1;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
-.course-code {
-  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+.course-badge {
   color: white;
-  padding: 6px 16px;
+  padding: 8px 14px;
   border-radius: 8px;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
+  letter-spacing: 0.5px;
 }
 
-.btn-icon {
-  background: none;
+.card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.action-btn {
+  width: 34px;
+  height: 34px;
   border: none;
-  font-size: 24px;
-  color: var(--text-secondary);
+  background: #f3f4f6;
+  border-radius: 8px;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
+  font-size: 15px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn:hover {
+  background: #e0e7ff;
+}
+
+.action-btn.delete:hover {
+  background: #fee2e2;
+}
+
+.course-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 14px 0;
+  line-height: 1.4;
+}
+
+.course-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.info-icon {
+  font-size: 15px;
+}
+
+/* Course Stats */
+.course-stats {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.mini-stat {
+  flex: 1;
+  background: #f9fafb;
+  padding: 12px 10px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.mini-stat-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.mini-stat-label {
+  font-size: 11px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Progress Section */
+.progress-section {
+  margin-bottom: 0;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.progress-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.progress-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.progress-bar {
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+/* Card Footer */
+.card-footer {
+  padding: 14px 22px;
+  border-top: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.btn-view-details {
+  width: 100%;
+  padding: 11px;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  color: #374151;
   transition: all 0.2s;
 }
 
-.btn-icon:hover {
-  background: var(--bg-primary);
-}
-
-.course-name {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 16px;
-}
-
-.course-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.card-footer {
-  border-top: 1px solid var(--border-color);
-  padding-top: 16px;
+.btn-view-details:hover {
+  border-color: #667eea;
+  color: #667eea;
+  background: #f5f7ff;
 }
 
 /* Modal Styles */
@@ -281,6 +770,7 @@ onMounted(() => {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -290,81 +780,128 @@ onMounted(() => {
 
 .modal-content {
   background: white;
-  border-radius: 16px;
+  border-radius: 20px;
   max-width: 500px;
   width: 100%;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px;
-  border-bottom: 1px solid var(--border-color);
+  padding: 22px 26px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
 }
 
 .modal-header h3 {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
+  margin: 0;
 }
 
 .btn-close {
-  background: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
   border: none;
-  font-size: 32px;
-  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 22px;
   cursor: pointer;
-  width: 36px;
-  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
   transition: all 0.2s;
+  line-height: 1;
 }
 
 .btn-close:hover {
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .modal-body {
-  padding: 24px;
+  padding: 26px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 500px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .form-group label {
   display: block;
   font-weight: 600;
+  color: #374151;
   margin-bottom: 8px;
-  color: var(--text-primary);
+  font-size: 14px;
 }
 
-.form-group input,
-.form-group textarea {
+.form-group input {
   width: 100%;
-  padding: 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  padding: 12px 14px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
   font-size: 14px;
   transition: all 0.2s;
 }
 
-.form-group input:focus,
-.form-group textarea:focus {
+.form-group input:focus {
   outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
 }
 
 .modal-footer {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
-  margin-top: 24px;
+  padding-top: 8px;
+}
+
+.btn-secondary {
+  padding: 12px 22px;
+  background: #f3f4f6;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  color: #374151;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: #e5e7eb;
+}
+
+.btn-primary {
+  padding: 12px 22px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  color: white;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 </style>
