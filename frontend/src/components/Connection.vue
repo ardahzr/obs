@@ -99,7 +99,7 @@ svg {
   height: 9999px;
   left: 0;
   top: 0;
-  z-index: 1;
+  z-index: -1;
 }
 
 path {
@@ -120,7 +120,7 @@ path {
   align-items: center;
   pointer-events: auto;
   box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-  z-index: 10;
+  z-index: 1 !important;
   left: 0;
   top: 0;
   cursor: text;

@@ -27,10 +27,11 @@ defineProps({
   padding: 10px;
   border-radius: 8px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-  z-index: 1000;
+  z-index: 99999 !important;
   margin-left: 12px;
   text-align: left;
   pointer-events: none; /* Let clicks pass through if needed, but we stop propagation on container */
+  isolation: isolate;
 }
 
 .description-control::before {

@@ -884,6 +884,16 @@ watch(selectedCourse, (newVal) => {
   overflow: hidden !important;
 }
 
+/* Connections layer should have lower z-index */
+:deep(.rete > div:first-child) {
+  z-index: 1 !important;
+}
+
+/* Nodes layer should be above connections */
+:deep(.rete > div:nth-child(2)) {
+  z-index: 2 !important;
+}
+
 :deep(.node) {
   background: white;
   border: 2px solid #ddd;
@@ -950,6 +960,31 @@ watch(selectedCourse, (newVal) => {
 
 :deep(.node.selected .description-control) {
   display: block;
+  z-index: 99999 !important;
+  position: absolute;
+}
+
+/* Ensure selected nodes wrapper has highest z-index */
+:deep([data-testid="node"].selected),
+:deep(.learning-outcome:has(.node.selected)),
+:deep(.program-outcome:has(.node.selected)),
+:deep(.assessment:has(.node.selected)) {
+  z-index: 99999 !important;
+}
+
+/* Ensure selected nodes are above connections */
+:deep(.node.selected) {
+  z-index: 99999 !important;
+}
+
+/* Force weight containers to be below description */
+:deep(.weight-container) {
+  z-index: 1 !important;
+}
+
+/* Force connections layer to be below selected nodes */
+:deep([data-testid="connection"]) {
+  z-index: 0 !important;
 }
 
 /* Node Type Colors - Applied to wrapper via pipe */
