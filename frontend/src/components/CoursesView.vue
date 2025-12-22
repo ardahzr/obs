@@ -334,6 +334,10 @@ async function deleteCourse(id) {
   }
 }
 
+function viewCourseDetails(id) {
+  console.log('View course:', id)
+}
+
 onMounted(() => {
   loadData()
 })
@@ -579,12 +583,9 @@ onMounted(() => {
 .course-card {
   background: white;
   border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #f0f0f0;
+  padding: 24px;
+  transition: all 0.3s;
+  box-shadow: var(--shadow-sm);
 }
 
 .course-card:hover {
@@ -756,10 +757,9 @@ onMounted(() => {
   transition: all 0.2s;
 }
 
-.btn-view-details:hover {
-  border-color: #667eea;
-  color: #667eea;
-  background: #f5f7ff;
+.card-footer {
+  border-top: 1px solid var(--border-color);
+  padding-top: 16px;
 }
 
 /* Modal Styles */
