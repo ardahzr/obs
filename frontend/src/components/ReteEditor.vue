@@ -76,6 +76,14 @@ import api from '@/services/api';
 import CustomConnection from './Connection.vue';
 import DescriptionControl from './DescriptionControl.vue';
 
+// Props for preselecting a course
+const props = defineProps({
+  preselectedCourse: {
+    type: [String, Number],
+    default: null
+  }
+});
+
 const reteContainer = ref(null);
 const selectedCourse = ref('');
 const courses = ref([]);
@@ -171,10 +179,10 @@ class PONode extends ClassicPreset.Node {
 
 // Custom Connection with weight
 class WeightedConnection extends ClassicPreset.Connection {
-  weight = 1.0;
+  weight = 50.0;
   dbId = null;
   
-  constructor(source, sourceOutput, target, targetInput, weight = 1.0, dbId = null) {
+  constructor(source, sourceOutput, target, targetInput, weight = 50.0, dbId = null) {
     super(source, sourceOutput, target, targetInput);
     this.weight = weight;
     this.dbId = dbId;
@@ -587,7 +595,7 @@ async function handleConnectionCreated(connection) {
       response = await api.createLoToPoMapping({
         learning_outcome: sourceNode.loData.id,
         program_outcome: targetNode.poData.id,
-        weight: connection.weight || 1.0
+        contribution_weight: connection.weight || 50.0
       });
     }
 
@@ -684,8 +692,20 @@ onMounted(async () => {
     
     // Initialize editor after DOM is ready
     await initializeEditor();
+    
+    // If a preselected course is provided, select it automatically
+    if (props.preselectedCourse) {
+      selectedCourse.value = props.preselectedCourse;
+    }
   } catch (error) {
     console.error('Error loading courses:', error);
+  }
+});
+
+// Watch for preselectedCourse prop changes
+watch(() => props.preselectedCourse, (newVal) => {
+  if (newVal && courses.value.length > 0) {
+    selectedCourse.value = newVal;
   }
 });
 

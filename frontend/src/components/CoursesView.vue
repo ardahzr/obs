@@ -75,6 +75,8 @@
 import { ref, onMounted } from 'vue'
 import api from '../services/api'
 
+const emit = defineEmits(['viewCourse'])
+
 const courses = ref([])
 const showAddModal = ref(false)
 const newCourse = ref({
@@ -120,7 +122,7 @@ async function deleteCourse(id) {
 }
 
 function viewCourseDetails(id) {
-  console.log('View course:', id)
+  emit('viewCourse', id)
 }
 
 onMounted(() => {
@@ -207,6 +209,8 @@ onMounted(() => {
   padding: 24px;
   transition: all 0.3s;
   box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
 }
 
 .course-card:hover {
@@ -271,6 +275,7 @@ onMounted(() => {
 .card-footer {
   border-top: 1px solid var(--border-color);
   padding-top: 16px;
+  margin-top: auto;
 }
 
 /* Modal Styles */

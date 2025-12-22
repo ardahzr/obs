@@ -71,11 +71,17 @@
     <!-- Main Content Area -->
     <main class="content-area">
       <Dashboard v-if="currentView === 'dashboard'" />
-      <CoursesView v-else-if="currentView === 'courses'" />
+      <CoursesView v-else-if="currentView === 'courses'" @viewCourse="viewCourseDetails" />
+      <CourseDetailView 
+        v-else-if="currentView === 'course-detail'" 
+        :courseId="selectedCourseId" 
+        @back="currentView = 'courses'"
+        @openEditor="openEditorForCourse"
+      />
       <LearningOutcomesView v-else-if="currentView === 'learning-outcomes'" />
       <OutcomesView v-else-if="currentView === 'outcomes'" />
       <div v-else-if="currentView === 'editor'" class="editor-container">
-        <ReteEditor />
+        <ReteEditor :preselectedCourse="preselectedCourseForEditor" />
       </div>
       <StudentsView v-else-if="currentView === 'students'" />
       <ReportsView v-else-if="currentView === 'reports'" />
@@ -88,12 +94,25 @@ import { ref } from 'vue'
 import Dashboard from './components/Dashboard.vue'
 import ReteEditor from './components/ReteEditor.vue'
 import CoursesView from './components/CoursesView.vue'
+import CourseDetailView from './components/CourseDetailView.vue'
 import OutcomesView from './components/OutcomesView.vue'
 import LearningOutcomesView from './components/LearningOutcomesView.vue'
 import StudentsView from './components/StudentsView.vue'
 import ReportsView from './components/ReportsView.vue'
 
 const currentView = ref('dashboard')
+const selectedCourseId = ref(null)
+const preselectedCourseForEditor = ref(null)
+
+function viewCourseDetails(courseId) {
+  selectedCourseId.value = courseId
+  currentView.value = 'course-detail'
+}
+
+function openEditorForCourse(courseId) {
+  preselectedCourseForEditor.value = courseId
+  currentView.value = 'editor'
+}
 </script>
 
 <style>

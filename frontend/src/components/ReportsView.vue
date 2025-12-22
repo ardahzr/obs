@@ -51,7 +51,7 @@
         <div class="report-content">
           <div v-for="po in poReport" :key="po.id" class="coverage-item">
             <div class="coverage-header">
-              <span class="coverage-label">PO{{ po.id }}</span>
+              <span class="coverage-label">{{ po.id }}</span>
               <span class="coverage-count">{{ po.mappingCount }} mappings</span>
             </div>
             <div class="coverage-bar">
