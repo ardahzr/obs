@@ -3,6 +3,28 @@ from django.contrib.auth.models import User
 
 # Create your models here.
 
+class UserProfile(models.Model):
+    """Kullanıcı profili - Admin veya Instructor"""
+    USER_TYPES = [
+        ('admin', 'Admin'),
+        ('instructor', 'Instructor'),
+    ]
+    
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    user_type = models.CharField(max_length=20, choices=USER_TYPES, default='instructor')
+    department = models.CharField(max_length=100, default='CSE')
+    
+    def __str__(self):
+        return f"{self.user.username} ({self.get_user_type_display()})"
+    
+    @property
+    def is_admin(self):
+        return self.user_type == 'admin'
+    
+    @property
+    def is_instructor(self):
+        return self.user_type == 'instructor'
+
 class Course(models.Model):
     """Ders modeli - CSE311, CSE321 gibi dersler"""
     code = models.CharField(max_length=16, unique=True)

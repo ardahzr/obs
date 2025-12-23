@@ -1,90 +1,111 @@
 <template>
   <div id="app">
-    <!-- Top Navigation Bar -->
-    <header class="top-navbar">
-      <div class="navbar-left">
-        <div class="logo">
-          <span class="logo-icon">🎓</span>
-          <span class="logo-text">PO Manager</span>
+    <!-- Login sayfası - Giriş yapmamışsa göster -->
+    <LoginView v-if="!isAuthenticated" @login-success="handleLoginSuccess" />
+    
+    <!-- Ana uygulama - Giriş yapmışsa göster -->
+    <template v-else>
+      <!-- Top Navigation Bar -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <div class="logo">
+            <span class="logo-icon">🎓</span>
+            <span class="logo-text">PO Manager</span>
+          </div>
         </div>
-      </div>
-      
-      <nav class="navbar-center">
-        <button 
-          :class="['nav-item', { active: currentView === 'dashboard' }]" 
-          @click="currentView = 'dashboard'">
-          <span class="nav-icon">📊</span>
-          <span class="nav-text">Dashboard</span>
-        </button>
         
-        <button 
-          :class="['nav-item', { active: currentView === 'courses' }]" 
-          @click="currentView = 'courses'">
-          <span class="nav-icon">📚</span>
-          <span class="nav-text">Courses</span>
-        </button>
+        <nav class="navbar-center">
+          <button 
+            :class="['nav-item', { active: currentView === 'dashboard' }]" 
+            @click="currentView = 'dashboard'">
+            <span class="nav-icon">📊</span>
+            <span class="nav-text">Dashboard</span>
+          </button>
+          
+          <button 
+            :class="['nav-item', { active: currentView === 'courses' }]" 
+            @click="currentView = 'courses'">
+            <span class="nav-icon">📚</span>
+            <span class="nav-text">Courses</span>
+          </button>
 
-        <button 
-          :class="['nav-item', { active: currentView === 'learning-outcomes' }]" 
-          @click="currentView = 'learning-outcomes'">
-          <span class="nav-icon">📝</span>
-          <span class="nav-text">Learning Outcomes</span>
-        </button>
-        
-        <button 
-          :class="['nav-item', { active: currentView === 'outcomes' }]" 
-          @click="currentView = 'outcomes'">
-          <span class="nav-icon">🎯</span>
-          <span class="nav-text">Program Outcomes</span>
-        </button>
-        
-        <button 
-          :class="['nav-item', { active: currentView === 'editor' }]" 
-          @click="currentView = 'editor'">
-          <span class="nav-icon">🔗</span>
-          <span class="nav-text">LO-PO Mapping</span>
-        </button>
-        
-        <button 
-          :class="['nav-item', { active: currentView === 'students' }]" 
-          @click="currentView = 'students'">
-          <span class="nav-icon">👥</span>
-          <span class="nav-text">Students</span>
-        </button>
-        
-        <button 
-          :class="['nav-item', { active: currentView === 'reports' }]" 
-          @click="currentView = 'reports'">
-          <span class="nav-icon">📈</span>
-          <span class="nav-text">Reports</span>
-        </button>
-      </nav>
+          <button 
+            :class="['nav-item', { active: currentView === 'learning-outcomes' }]" 
+            @click="currentView = 'learning-outcomes'">
+            <span class="nav-icon">📝</span>
+            <span class="nav-text">Learning Outcomes</span>
+          </button>
+          
+          <button 
+            :class="['nav-item', { active: currentView === 'outcomes' }]" 
+            @click="currentView = 'outcomes'">
+            <span class="nav-icon">🎯</span>
+            <span class="nav-text">Program Outcomes</span>
+          </button>
+          
+          <button 
+            :class="['nav-item', { active: currentView === 'editor' }]" 
+            @click="currentView = 'editor'">
+            <span class="nav-icon">🔗</span>
+            <span class="nav-text">LO-PO Mapping</span>
+          </button>
+          
+          <button 
+            :class="['nav-item', { active: currentView === 'students' }]" 
+            @click="currentView = 'students'">
+            <span class="nav-icon">👥</span>
+            <span class="nav-text">Students</span>
+          </button>
+          
+          <button 
+            :class="['nav-item', { active: currentView === 'reports' }]" 
+            @click="currentView = 'reports'">
+            <span class="nav-icon">📈</span>
+            <span class="nav-text">Reports</span>
+          </button>
+        </nav>
 
-      <div class="navbar-right">
-        <div class="user-info">
-          <div class="user-avatar">👤</div>
-          <div class="user-name">Admin</div>
+        <div class="navbar-right">
+          <div class="user-menu">
+            <div class="user-info" @click="showUserMenu = !showUserMenu">
+              <div class="user-avatar">{{ userInitials }}</div>
+              <div class="user-details">
+                <div class="user-name">{{ currentUser?.first_name || currentUser?.username }}</div>
+                <div class="user-role">{{ currentUser?.user_type === 'admin' ? 'Admin' : 'Instructor' }}</div>
+              </div>
+              <span class="dropdown-arrow">▼</span>
+            </div>
+            <div v-if="showUserMenu" class="user-dropdown">
+              <div class="dropdown-header">
+                <strong>{{ currentUser?.first_name }} {{ currentUser?.last_name }}</strong>
+                <small>@{{ currentUser?.username }}</small>
+              </div>
+              <button @click="handleLogout" class="logout-btn">
+                <span>🚪</span> Çıkış Yap
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
 
-    <!-- Main Content Area -->
-    <main class="content-area">
-      <Dashboard v-if="currentView === 'dashboard'" />
-      <CoursesView v-else-if="currentView === 'courses'" />
-      <LearningOutcomesView v-else-if="currentView === 'learning-outcomes'" />
-      <OutcomesView v-else-if="currentView === 'outcomes'" />
-      <div v-else-if="currentView === 'editor'" class="editor-container">
-        <ReteEditor />
-      </div>
-      <StudentsView v-else-if="currentView === 'students'" />
-      <ReportsView v-else-if="currentView === 'reports'" />
-    </main>
+      <!-- Main Content Area -->
+      <main class="content-area">
+        <Dashboard v-if="currentView === 'dashboard'" />
+        <CoursesView v-else-if="currentView === 'courses'" />
+        <LearningOutcomesView v-else-if="currentView === 'learning-outcomes'" />
+        <OutcomesView v-else-if="currentView === 'outcomes'" />
+        <div v-else-if="currentView === 'editor'" class="editor-container">
+          <ReteEditor />
+        </div>
+        <StudentsView v-else-if="currentView === 'students'" />
+        <ReportsView v-else-if="currentView === 'reports'" />
+      </main>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Dashboard from './components/Dashboard.vue'
 import ReteEditor from './components/ReteEditor.vue'
 import CoursesView from './components/CoursesView.vue'
@@ -92,8 +113,60 @@ import OutcomesView from './components/OutcomesView.vue'
 import LearningOutcomesView from './components/LearningOutcomesView.vue'
 import StudentsView from './components/StudentsView.vue'
 import ReportsView from './components/ReportsView.vue'
+import LoginView from './components/LoginView.vue'
+import api from './services/api'
 
 const currentView = ref('dashboard')
+const isAuthenticated = ref(false)
+const currentUser = ref(null)
+const showUserMenu = ref(false)
+
+const userInitials = computed(() => {
+  if (currentUser.value?.first_name && currentUser.value?.last_name) {
+    return currentUser.value.first_name[0] + currentUser.value.last_name[0]
+  }
+  return currentUser.value?.username?.[0]?.toUpperCase() || '?'
+})
+
+// Sayfa yüklendiğinde token kontrolü
+onMounted(() => {
+  const token = localStorage.getItem('token')
+  const user = localStorage.getItem('user')
+  
+  if (token && user) {
+    isAuthenticated.value = true
+    currentUser.value = JSON.parse(user)
+  }
+})
+
+const handleLoginSuccess = (user) => {
+  isAuthenticated.value = true
+  currentUser.value = user
+}
+
+const handleLogout = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    if (token) {
+      await api.logout(token)
+    }
+  } catch (err) {
+    console.error('Logout error:', err)
+  } finally {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    isAuthenticated.value = false
+    currentUser.value = null
+    showUserMenu.value = false
+  }
+}
+
+// Click outside to close user menu
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.user-menu')) {
+    showUserMenu.value = false
+  }
+})
 </script>
 
 <style>
@@ -257,12 +330,94 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.user-info:hover {
+  background: var(--bg-primary);
+}
+
+.user-menu {
+  position: relative;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.user-role {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-left: 4px;
+}
+
+.user-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  overflow: hidden;
+  z-index: 1001;
+}
+
+.dropdown-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdown-header strong {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.dropdown-header small {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.logout-btn {
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #ef4444;
+  transition: background 0.2s;
+}
+
+.logout-btn:hover {
+  background: #fef2f2;
 }
 
 .user-avatar {
   width: 32px;
   height: 32px;
   background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
   border-radius: 50%;
   display: flex;
   align-items: center;
