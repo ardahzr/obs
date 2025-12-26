@@ -1,0 +1,49 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.pytest_cache/
+*.log
+
+# Django artifacts
+staticfiles/
+media/
+*.sqlite3
+/db.sqlite3
+/po_manager/db.sqlite3
+
+# Environments
+.env
+.env.*
+.venv/
+venv/
+ENV/
+
+# Node / Vue
+node_modules/
+dist/
+coverage/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editors
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.swp
+*.swo
+*.tmp
+*.bak
+*~
