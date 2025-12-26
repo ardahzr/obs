@@ -2,17 +2,21 @@ from django.shortcuts import render
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Avg, Sum, F, Q
+from django.contrib.auth import login, logout
+from django.contrib.auth.models import User
+from rest_framework.authtoken.models import Token
 
 from .models import (
     Course, ProgramOutcome, LearningOutcome, 
-    LoToPoMapping, Student, Assessment, AssessmentToLoMapping, Grade
+    LoToPoMapping, Student, Assessment, AssessmentToLoMapping, Grade, UserProfile
 )
 from .serializers import (
     CourseSerializer, CourseDetailSerializer, ProgramOutcomeSerializer,
     LearningOutcomeSerializer, LoToPoMappingSerializer, StudentSerializer,
-    AssessmentSerializer, AssessmentToLoMappingSerializer, GradeSerializer
+    AssessmentSerializer, AssessmentToLoMappingSerializer, GradeSerializer,
+    LoginSerializer, RegisterSerializer, UserSerializer
 )
 from .chat_utils import chat_with_gemini
 
@@ -22,6 +26,114 @@ from .chat_utils import chat_with_gemini
 @api_view(['GET'])
 def test_api(request):
     return Response({"message": "Hello from Django API!"})
+
+
+# ============ AUTH VIEWS ============
+
+@api_view(['POST'])
+def login_view(request):
+    """Kullanıcı girişi"""
+    serializer = LoginSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.validated_data['user']
+        token, created = Token.objects.get_or_create(user=user)
+        
+        # Profil bilgisi al
+        try:
+            profile = user.profile
+            user_type = profile.user_type
+        except UserProfile.DoesNotExist:
+            user_type = 'instructor'
+        
+        return Response({
+            'success': True,
+            'message': 'Giriş başarılı',
+            'token': token.key,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'user_type': user_type
+            }
+        })
+    return Response({
+        'success': False,
+        'message': serializer.errors
+    }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def logout_view(request):
+    """Kullanıcı çıkışı"""
+    try:
+        # Token'ı sil
+        if request.auth:
+            request.auth.delete()
+    except:
+        pass
+    
+    return Response({
+        'success': True,
+        'message': 'Çıkış başarılı'
+    })
+
+
+@api_view(['POST'])
+def register_view(request):
+    """Yeni kullanıcı kaydı (sadece admin yapabilir)"""
+    serializer = RegisterSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.save()
+        return Response({
+            'success': True,
+            'message': 'Kullanıcı başarıyla oluşturuldu',
+            'user': UserSerializer(user).data
+        }, status=status.HTTP_201_CREATED)
+    return Response({
+        'success': False,
+        'message': serializer.errors
+    }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def me_view(request):
+    """Mevcut kullanıcı bilgisi"""
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Token '):
+        return Response({
+            'success': False,
+            'message': 'Token gerekli'
+        }, status=status.HTTP_401_UNAUTHORIZED)
+    
+    token_key = auth_header.split(' ')[1]
+    try:
+        token = Token.objects.get(key=token_key)
+        user = token.user
+        
+        try:
+            profile = user.profile
+            user_type = profile.user_type
+        except UserProfile.DoesNotExist:
+            user_type = 'instructor'
+        
+        return Response({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'user_type': user_type
+            }
+        })
+    except Token.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Geçersiz token'
+        }, status=status.HTTP_401_UNAUTHORIZED)
 
 
 class CourseViewSet(viewsets.ModelViewSet):

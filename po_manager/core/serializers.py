@@ -1,16 +1,87 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from django.contrib.auth import authenticate
 from .models import (
     Course, ProgramOutcome, LearningOutcome, 
-    LoToPoMapping, Student, Assessment, AssessmentToLoMapping, Grade
+    LoToPoMapping, Student, Assessment, AssessmentToLoMapping, Grade, UserProfile
 )
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Kullanıcı profil serializer"""
+    class Meta:
+        model = UserProfile
+        fields = ['user_type', 'department', 'is_admin', 'is_instructor']
 
 
 class UserSerializer(serializers.ModelSerializer):
     """Kullanıcı serializer"""
+    profile = UserProfileSerializer(read_only=True)
+    
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'profile']
+
+
+class LoginSerializer(serializers.Serializer):
+    """Login serializer"""
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+    
+    def validate(self, data):
+        username = data.get('username')
+        password = data.get('password')
+        
+        if username and password:
+            user = authenticate(username=username, password=password)
+            if user:
+                if not user.is_active:
+                    raise serializers.ValidationError("Hesabınız aktif değil.")
+                data['user'] = user
+            else:
+                raise serializers.ValidationError("Kullanıcı adı veya şifre hatalı.")
+        else:
+            raise serializers.ValidationError("Kullanıcı adı ve şifre gerekli.")
+        
+        return data
+
+
+class RegisterSerializer(serializers.Serializer):
+    """Register serializer - sadece admin yeni kullanıcı oluşturabilir"""
+    username = serializers.CharField()
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    first_name = serializers.CharField(required=False, default='')
+    last_name = serializers.CharField(required=False, default='')
+    user_type = serializers.ChoiceField(choices=['admin', 'instructor'], default='instructor')
+    department = serializers.CharField(default='CSE')
+    
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Bu kullanıcı adı zaten kullanılıyor.")
+        return value
+    
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Bu email adresi zaten kullanılıyor.")
+        return value
+    
+    def create(self, validated_data):
+        user_type = validated_data.pop('user_type')
+        department = validated_data.pop('department')
+        password = validated_data.pop('password')
+        
+        user = User.objects.create_user(**validated_data)
+        user.set_password(password)
+        user.save()
+        
+        UserProfile.objects.create(
+            user=user,
+            user_type=user_type,
+            department=department
+        )
+        
+        return user
 
 
 class CourseSerializer(serializers.ModelSerializer):
