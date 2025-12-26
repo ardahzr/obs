@@ -100,9 +100,6 @@
               {{ course.code }}
             </div>
             <div class="card-actions">
-              <button @click="$emit('viewCourse', course.id)" class="action-btn" title="View Details">
-                👁️
-              </button>
               <button @click="deleteCourse(course.id)" class="action-btn delete" title="Delete Course">
                 🗑️
               </button>
@@ -125,33 +122,19 @@
           <!-- Course Stats -->
           <div class="course-stats">
             <div class="mini-stat">
+              <span class="mini-stat-icon">📚</span>
               <span class="mini-stat-value">{{ getCourseLoCount(course.id) }}</span>
-              <span class="mini-stat-label">LOs</span>
+              <span class="mini-stat-label">Learning Outcomes</span>
             </div>
             <div class="mini-stat">
+              <span class="mini-stat-icon">📝</span>
               <span class="mini-stat-value">{{ getCourseAssessmentCount(course.id) }}</span>
               <span class="mini-stat-label">Assessments</span>
             </div>
             <div class="mini-stat">
+              <span class="mini-stat-icon">🔗</span>
               <span class="mini-stat-value">{{ getCourseMappingCount(course.id) }}</span>
-              <span class="mini-stat-label">Mappings</span>
-            </div>
-          </div>
-
-          <!-- Progress Bar -->
-          <div class="progress-section">
-            <div class="progress-header">
-              <span class="progress-label">Setup Progress</span>
-              <span class="progress-value">{{ getCourseProgress(course.id) }}%</span>
-            </div>
-            <div class="progress-bar">
-              <div 
-                class="progress-fill" 
-                :style="{ 
-                  width: getCourseProgress(course.id) + '%',
-                  background: getProgressColor(getCourseProgress(course.id))
-                }"
-              ></div>
+              <span class="mini-stat-label">PO Mappings</span>
             </div>
           </div>
         </div>
@@ -682,24 +665,39 @@ onMounted(() => {
 
 .mini-stat {
   flex: 1;
-  background: #f9fafb;
-  padding: 12px 10px;
-  border-radius: 10px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  padding: 16px 12px;
+  border-radius: 12px;
   text-align: center;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+}
+
+.mini-stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.mini-stat-icon {
+  display: block;
+  font-size: 20px;
+  margin-bottom: 6px;
 }
 
 .mini-stat-value {
   display: block;
-  font-size: 18px;
+  font-size: 24px;
   font-weight: 700;
-  color: #1f2937;
+  color: #1e293b;
+  margin-bottom: 4px;
 }
 
 .mini-stat-label {
-  font-size: 11px;
-  color: #6b7280;
+  font-size: 10px;
+  color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
 }
 
 /* Progress Section */
