@@ -133,5 +133,31 @@ export default {
   // Chat
   chatWithGemini(message) {
     return api.post('chat/', { message })
+  },
+
+  // Auth
+  login(username, password) {
+    return api.post('auth/login/', { username, password })
+  },
+  logout(token) {
+    return api.post('auth/logout/', {}, {
+      headers: { Authorization: `Token ${token}` }
+    })
+  },
+  register(data) {
+    return api.post('auth/register/', data)
+  },
+  getMe(token) {
+    return api.get('auth/me/', {
+      headers: { Authorization: `Token ${token}` }
+    })
+  },
+
+  // Raw axios methods for flexibility
+  post(url, data, config) {
+    return api.post(url, data, config)
+  },
+  get(url, config) {
+    return api.get(url, config)
   }
 }

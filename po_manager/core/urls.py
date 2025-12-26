@@ -15,4 +15,9 @@ router.register(r'grades', views.GradeViewSet)
 urlpatterns = [
     path('', include(router.urls)),
     path('chat/', views.chat_view, name='chat'),
+    # Auth endpoints
+    path('auth/login/', views.login_view, name='login'),
+    path('auth/logout/', views.logout_view, name='logout'),
+    path('auth/register/', views.register_view, name='register'),
+    path('auth/me/', views.me_view, name='me'),
 ]
