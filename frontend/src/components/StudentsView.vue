@@ -22,7 +22,7 @@
     </div>
 
     <div v-if="students.length === 0" class="empty-state">
-      <p>{{ selectedCourseId ? 'Bu derste kayıtlı öğrenci yok.' : 'Henüz öğrenci eklenmemiş.' }}</p>
+      <p>{{ selectedCourseId ? 'No students enrolled in this course.' : 'No students added yet.' }}</p>
     </div>
 
     <div class="students-list">

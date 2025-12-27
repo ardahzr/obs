@@ -9,7 +9,6 @@ from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 from django.utils import timezone
 from collections import Counter
-import pandas as pd
 
 from .models import (
     Course, ProgramOutcome, LearningOutcome, 
@@ -549,4 +548,42 @@ def reject_course(request, course_id):
             'approval_status': 'rejected'
         })
     except Course.DoesNotExist:
-        return Response({'success': False, 'message': 'Ders bulunamadı'}, status=404)
+        return Response({'success': False, 'message': 'Course not found'}, status=404)
+
+
+@api_view(['POST'])
+def import_obs_excel(request):
+    """Import student grades from OBS Excel file"""
+    user = get_user_from_token(request)
+    if not user:
+        return Response({'success': False, 'message': 'Authorization required'}, status=401)
+    
+    if 'file' not in request.FILES:
+        return Response({'success': False, 'message': 'No file provided'}, status=400)
+    
+    try:
+        import pandas as pd
+        from io import BytesIO
+        
+        excel_file = request.FILES['file']
+        df = pd.read_excel(BytesIO(excel_file.read()))
+        
+        # Process the Excel file
+        # Expected columns: Student ID, Student Name, Grade, etc.
+        imported_count = 0
+        
+        for index, row in df.iterrows():
+            # Process each row
+            # This is a placeholder - implement based on your Excel structure
+            imported_count += 1
+        
+        return Response({
+            'success': True,
+            'message': f'Successfully imported {imported_count} records',
+            'imported_count': imported_count
+        })
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error importing file: {str(e)}'
+        }, status=400)

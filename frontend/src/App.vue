@@ -16,13 +16,6 @@
         
         <nav class="navbar-center">
           <button 
-            :class="['nav-item', { active: currentView === 'dashboard' }]" 
-            @click="currentView = 'dashboard'">
-            <span class="nav-icon">📊</span>
-            <span class="nav-text">Dashboard</span>
-          </button>
-          
-          <button 
             :class="['nav-item', { active: currentView === 'courses' }]" 
             @click="currentView = 'courses'">
             <span class="nav-icon">📚</span>
@@ -93,7 +86,7 @@
                 <small>@{{ currentUser?.username }}</small>
               </div>
               <button @click="handleLogout" class="logout-btn">
-                <span>🚪</span> Çıkış Yap
+                <span>🚪</span> Logout
               </button>
             </div>
           </div>
@@ -102,9 +95,8 @@
 
       <!-- Main Content Area -->
       <main class="content-area">
-        <Dashboard v-if="currentView === 'dashboard'" />
         <CoursesView 
-          v-else-if="currentView === 'courses'" 
+          v-if="currentView === 'courses'" 
           @viewCourse="viewCourseDetails" 
         />
         <CourseDetailView 
@@ -128,7 +120,6 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import Dashboard from './components/Dashboard.vue'
 import ReteEditor from './components/ReteEditor.vue'
 import CoursesView from './components/CoursesView.vue'
 import CourseDetailView from './components/CourseDetailView.vue'
@@ -141,7 +132,7 @@ import NotificationDropdown from './components/NotificationDropdown.vue'
 import ApprovalsView from './components/ApprovalsView.vue'
 import api from './services/api'
 
-const currentView = ref('dashboard')
+const currentView = ref('courses')
 const selectedCourseId = ref(null)
 const preselectedCourseForEditor = ref(null)
 const isAuthenticated = ref(false)

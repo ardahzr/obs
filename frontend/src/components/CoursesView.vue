@@ -422,7 +422,9 @@ async function deleteCourse(id) {
     await loadData()
   } catch (error) {
     console.error('Error deleting course:', error)
-    alert('Failed to delete course')
+    console.error('Response:', error.response?.data)
+    console.error('Status:', error.response?.status)
+    alert('Failed to delete course: ' + (error.response?.data?.detail || error.message))
   }
 }
 
