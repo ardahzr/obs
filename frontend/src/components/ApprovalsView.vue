@@ -1,19 +1,19 @@
 <template>
   <div class="approvals-container">
     <div class="page-header">
-      <h1>📋 Bekleyen Onaylar</h1>
-      <p class="subtitle">Öğretim üyelerinden gelen ders onay istekleri</p>
+      <h1>📋 Pending Approvals</h1>
+      <p class="subtitle">Course approval requests from faculty members</p>
     </div>
 
     <div v-if="loading" class="loading-state">
       <span class="loading-spinner"></span>
-      <p>Yükleniyor...</p>
+      <p>Loading...</p>
     </div>
 
     <div v-else-if="pendingCourses.length === 0" class="empty-state">
       <span class="empty-icon">✅</span>
-      <h3>Bekleyen Onay Yok</h3>
-      <p>Şu anda onay bekleyen ders bulunmuyor.</p>
+      <h3>No Pending Approvals</h3>
+      <p>There are no courses waiting for approval.</p>
     </div>
 
     <div v-else class="approvals-grid">
@@ -23,34 +23,34 @@
             <span class="course-code">{{ course.code }}</span>
             <h3 class="course-name">{{ course.name }}</h3>
           </div>
-          <span class="status-badge pending">Onay Bekliyor</span>
+          <span class="status-badge pending">Pending Approval</span>
         </div>
 
         <div class="card-body">
           <div class="info-row">
-            <span class="label">👨‍🏫 Öğretim Üyesi:</span>
-            <span class="value">{{ course.instructor_name || 'Belirtilmemiş' }}</span>
+            <span class="label">👨‍🏫 Faculty Member:</span>
+            <span class="value">{{ course.instructor_name || 'Not specified' }}</span>
           </div>
           <div class="info-row">
-            <span class="label">🏢 Bölüm:</span>
+            <span class="label">🏢 Department:</span>
             <span class="value">{{ course.department }}</span>
           </div>
           <div class="info-row">
-            <span class="label">📅 Dönem:</span>
-            <span class="value">{{ course.semester || 'Belirtilmemiş' }}</span>
+            <span class="label">📅 Semester:</span>
+            <span class="value">{{ course.semester || 'Not specified' }}</span>
           </div>
           <div class="info-row">
-            <span class="label">📤 Gönderim:</span>
+            <span class="label">📤 Submission:</span>
             <span class="value">{{ formatDate(course.submitted_at) }}</span>
           </div>
         </div>
 
         <div class="card-actions">
           <button @click="openApproveModal(course)" class="approve-btn">
-            <span>✅</span> Onayla
+            <span>✅</span> Approve
           </button>
           <button @click="openRejectModal(course)" class="reject-btn">
-            <span>❌</span> Reddet
+            <span>❌</span> Reject
           </button>
         </div>
       </div>
@@ -61,24 +61,24 @@
       <div class="modal">
         <div class="modal-header approve">
           <span class="modal-icon">✅</span>
-          <h3>Dersi Onayla</h3>
+          <h3>Approve Course</h3>
         </div>
         <div class="modal-body">
           <p><strong>{{ selectedCourse?.code }}</strong> - {{ selectedCourse?.name }}</p>
           <div class="form-group">
-            <label>Mesaj (Opsiyonel)</label>
+            <label>Message (Optional)</label>
             <textarea 
               v-model="approveMessage" 
-              placeholder="Hocaya iletmek istediğiniz bir mesaj yazabilirsiniz..."
+              placeholder="You can write a message to the instructor..."
               rows="3"
             ></textarea>
           </div>
         </div>
         <div class="modal-actions">
-          <button @click="closeModals" class="cancel-btn">İptal</button>
+          <button @click="closeModals" class="cancel-btn">Cancel</button>
           <button @click="confirmApprove" class="confirm-approve-btn" :disabled="actionLoading">
             <span v-if="actionLoading" class="btn-spinner"></span>
-            <span v-else>Onayla</span>
+            <span v-else>Approve</span>
           </button>
         </div>
       </div>
@@ -89,15 +89,15 @@
       <div class="modal">
         <div class="modal-header reject">
           <span class="modal-icon">❌</span>
-          <h3>Dersi Reddet</h3>
+          <h3>Reject Course</h3>
         </div>
         <div class="modal-body">
           <p><strong>{{ selectedCourse?.code }}</strong> - {{ selectedCourse?.name }}</p>
           <div class="form-group">
-            <label>Red Sebebi <span class="required">*</span></label>
+            <label>Rejection Reason <span class="required">*</span></label>
             <textarea 
               v-model="rejectReason" 
-              placeholder="Reddetme sebebinizi açıklayın..."
+              placeholder="Please explain the reason for rejection..."
               rows="4"
               required
             ></textarea>
@@ -105,10 +105,10 @@
           </div>
         </div>
         <div class="modal-actions">
-          <button @click="closeModals" class="cancel-btn">İptal</button>
+          <button @click="closeModals" class="cancel-btn">Cancel</button>
           <button @click="confirmReject" class="confirm-reject-btn" :disabled="actionLoading">
             <span v-if="actionLoading" class="btn-spinner"></span>
-            <span v-else>Reddet</span>
+            <span v-else>Reject</span>
           </button>
         </div>
       </div>

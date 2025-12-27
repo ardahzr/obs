@@ -64,13 +64,13 @@
             <span class="nav-text">Reports</span>
           </button>
 
-          <!-- Admin için Onaylar butonu -->
+          <!-- Approvals button for Admin -->
           <button 
             v-if="currentUser?.user_type === 'admin'"
             :class="['nav-item', { active: currentView === 'approvals' }]" 
             @click="currentView = 'approvals'">
             <span class="nav-icon">📋</span>
-            <span class="nav-text">Onaylar</span>
+            <span class="nav-text">Approvals</span>
           </button>
         </nav>
 

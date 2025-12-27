@@ -26,12 +26,12 @@ class UserProfile(models.Model):
         return self.user_type == 'instructor'
 
 class Course(models.Model):
-    """Ders modeli - CSE311, CSE321 gibi dersler"""
+    """Course model - courses like CSE311, CSE321"""
     APPROVAL_STATUS = [
-        ('draft', 'Taslak'),
-        ('pending', 'Onay Bekliyor'),
-        ('approved', 'Onaylandı'),
-        ('rejected', 'Reddedildi'),
+        ('draft', 'Draft'),
+        ('pending', 'Pending Approval'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
     ]
     
     code = models.CharField(max_length=16, unique=True)
@@ -168,11 +168,11 @@ class Grade(models.Model):
 
 
 class Notification(models.Model):
-    """Bildirim modeli - Onay istekleri ve sonuçları"""
+    """Notification model - Approval requests and results"""
     NOTIFICATION_TYPES = [
-        ('approval_request', 'Onay İsteği'),
-        ('approved', 'Onaylandı'),
-        ('rejected', 'Reddedildi'),
+        ('approval_request', 'Approval Request'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
     ]
     
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')

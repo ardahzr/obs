@@ -7,21 +7,21 @@
 
     <div v-if="showDropdown" class="notification-dropdown">
       <div class="dropdown-header">
-        <h4>Bildirimler</h4>
+        <h4>Notifications</h4>
         <button v-if="notifications.length > 0" @click="markAllRead" class="mark-all-btn">
-          Tümünü Okundu İşaretle
+          Mark All as Read
         </button>
       </div>
 
       <div class="notification-list">
         <div v-if="loading" class="loading-state">
           <span class="loading-spinner"></span>
-          Yükleniyor...
+          Loading...
         </div>
 
         <div v-else-if="notifications.length === 0" class="empty-state">
           <span class="empty-icon">📭</span>
-          <p>Henüz bildirim yok</p>
+          <p>No notifications yet</p>
         </div>
 
         <div
@@ -132,12 +132,12 @@ const formatTime = (dateString) => {
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(diff / 86400000)
   
-  if (minutes < 1) return 'Az önce'
-  if (minutes < 60) return `${minutes} dakika önce`
-  if (hours < 24) return `${hours} saat önce`
-  if (days < 7) return `${days} gün önce`
+  if (minutes < 1) return 'Just now'
+  if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
+  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+  if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`
   
-  return date.toLocaleDateString('tr-TR')
+  return date.toLocaleDateString('en-US')
 }
 
 // Click outside to close

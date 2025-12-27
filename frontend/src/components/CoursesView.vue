@@ -156,7 +156,7 @@
           <button @click="$emit('viewCourse', course.id)" class="btn-view-details">
             View Details →
           </button>
-          <!-- Onaya Gönder butonu - sadece taslak veya reddedilmiş ise göster -->
+          <!-- Submit for Approval button - only show for draft or rejected -->
           <button 
             v-if="course.approval_status === 'draft' || course.approval_status === 'rejected'"
             @click.stop="submitForApproval(course)"
@@ -164,7 +164,7 @@
             :disabled="submittingCourse === course.id"
           >
             <span v-if="submittingCourse === course.id" class="btn-spinner"></span>
-            <span v-else>📤 Onaya Gönder</span>
+            <span v-else>📤 Submit for Approval</span>
           </button>
         </div>
       </div>
@@ -347,10 +347,10 @@ function viewCourseDetails(id) {
 // Approval status text helper
 function getApprovalStatusText(status) {
   const statusMap = {
-    'draft': 'Taslak',
-    'pending': 'Onay Bekliyor',
-    'approved': 'Onaylandı',
-    'rejected': 'Reddedildi'
+    'draft': 'Draft',
+    'pending': 'Pending Approval',
+    'approved': 'Approved',
+    'rejected': 'Rejected'
   }
   return statusMap[status] || status
 }
@@ -359,7 +359,7 @@ function getApprovalStatusText(status) {
 async function submitForApproval(course) {
   const token = localStorage.getItem('token')
   if (!token) {
-    alert('Lütfen giriş yapın')
+    alert('Please log in')
     return
   }
 
@@ -367,15 +367,15 @@ async function submitForApproval(course) {
   try {
     const response = await api.submitCourseForApproval(token, course.id)
     if (response.data.success) {
-      // Listeyi güncelle
+      // Update the list
       course.approval_status = 'pending'
-      alert('Ders onaya gönderildi!')
+      alert('Course submitted for approval!')
     } else {
-      alert(response.data.message || 'Bir hata oluştu')
+      alert(response.data.message || 'An error occurred')
     }
   } catch (error) {
     console.error('Error submitting for approval:', error)
-    alert(error.response?.data?.message || 'Bir hata oluştu')
+    alert(error.response?.data?.message || 'An error occurred')
   } finally {
     submittingCourse.value = null
   }
