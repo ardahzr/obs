@@ -177,7 +177,25 @@
           <h3>📚 Add New Course</h3>
           <button @click="showAddModal = false" class="btn-close">×</button>
         </div>
-        <form @submit.prevent="addCourse" class="modal-body">
+        
+        <!-- Tab Buttons -->
+        <div class="modal-tabs">
+          <button 
+            :class="['tab-btn', { active: addMode === 'manual' }]"
+            @click="addMode = 'manual'"
+          >
+            ✏️ Manual Entry
+          </button>
+          <button 
+            :class="['tab-btn', { active: addMode === 'excel' }]"
+            @click="addMode = 'excel'"
+          >
+            📊 Import from Excel
+          </button>
+        </div>
+
+        <!-- Manual Entry Form -->
+        <form v-if="addMode === 'manual'" @submit.prevent="addCourse" class="modal-body">
           <div class="form-row">
             <div class="form-group">
               <label>🏷️ Course Code</label>
@@ -205,6 +223,65 @@
             </button>
           </div>
         </form>
+
+        <!-- Excel Import Form -->
+        <div v-else class="modal-body">
+          <div class="excel-info">
+            <p>📋 Upload an OBS Excel file to automatically create the course with students, assessments, and grades.</p>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>🏷️ Course Code</label>
+              <input v-model="excelImport.courseCode" type="text" placeholder="e.g., CSE311" required />
+            </div>
+            <div class="form-group">
+              <label>📖 Course Name</label>
+              <input v-model="excelImport.courseName" type="text" placeholder="e.g., Software Engineering" required />
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>📁 Excel File</label>
+            <input 
+              type="file" 
+              accept=".xlsx,.xls" 
+              @change="handleExcelFile"
+              class="file-input"
+            />
+          </div>
+          
+          <div v-if="excelImport.importing" class="import-status">
+            <span class="loading-spinner">⏳</span> Importing...
+          </div>
+          
+          <div v-if="excelImport.result" :class="['import-result', excelImport.result.success ? 'success' : 'error']">
+            <template v-if="excelImport.result.success">
+              ✅ Import successful!<br/>
+              📚 Course: {{ excelImport.result.course_code }}<br/>
+              👥 Students: {{ excelImport.result.students_created }} created, {{ excelImport.result.students_updated }} updated<br/>
+              📝 Assessments: {{ excelImport.result.assessments_created || 0 }} created<br/>
+              📊 Grades: {{ excelImport.result.grades_created || 0 }} imported
+            </template>
+            <template v-else>
+              ❌ {{ excelImport.result.error }}
+            </template>
+          </div>
+          
+          <div class="modal-footer">
+            <button type="button" @click="closeExcelModal" class="btn-secondary">
+              Close
+            </button>
+            <button 
+              type="button" 
+              @click="importExcel" 
+              class="btn-primary"
+              :disabled="!excelImport.file || !excelImport.courseCode || !excelImport.courseName || excelImport.importing"
+            >
+              📥 Import Course
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -225,12 +302,21 @@ const showAddModal = ref(false)
 const searchQuery = ref('')
 const viewMode = ref('grid')
 const submittingCourse = ref(null)
+const addMode = ref('manual')
 
 const newCourse = ref({
   code: '',
   name: '',
   semester: '',
   department: 'CSE'
+})
+
+const excelImport = ref({
+  file: null,
+  courseCode: '',
+  courseName: '',
+  importing: false,
+  result: null
 })
 
 // Computed properties
@@ -337,6 +423,55 @@ async function deleteCourse(id) {
   } catch (error) {
     console.error('Error deleting course:', error)
     alert('Failed to delete course')
+  }
+}
+
+function handleExcelFile(event) {
+  const file = event.target.files[0]
+  if (file) {
+    excelImport.value.file = file
+    excelImport.value.result = null
+  }
+}
+
+async function importExcel() {
+  if (!excelImport.value.file || !excelImport.value.courseCode || !excelImport.value.courseName) {
+    alert('Please fill in course code, name, and select an Excel file')
+    return
+  }
+  
+  excelImport.value.importing = true
+  excelImport.value.result = null
+  
+  try {
+    const response = await api.importObsExcel(
+      excelImport.value.file,
+      null, // No existing course ID - create new
+      excelImport.value.courseCode,
+      excelImport.value.courseName
+    )
+    excelImport.value.result = { success: true, ...response.data }
+    await loadData() // Refresh courses list
+  } catch (error) {
+    console.error('Import error:', error)
+    excelImport.value.result = {
+      success: false,
+      error: error.response?.data?.error || 'Failed to import Excel file'
+    }
+  } finally {
+    excelImport.value.importing = false
+  }
+}
+
+function closeExcelModal() {
+  showAddModal.value = false
+  addMode.value = 'manual'
+  excelImport.value = {
+    file: null,
+    courseCode: '',
+    courseName: '',
+    importing: false,
+    result: null
   }
 }
 
@@ -963,6 +1098,12 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* Approval Status Badge */
 .header-right {
   display: flex;
@@ -1051,15 +1192,114 @@ onMounted(() => {
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
 .card-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+/* Modal Tabs */
+.modal-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 24px;
+  margin-bottom: 16px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-color: transparent;
+  color: white;
+}
+
+/* Excel Import Styles */
+.excel-info {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.excel-info p {
+  margin: 0;
+  color: #0369a1;
+  font-size: 14px;
+}
+
+.file-input {
+  width: 100%;
+  padding: 12px;
+  border: 2px dashed #d1d5db;
+  border-radius: 10px;
+  background: #f9fafb;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.file-input:hover {
+  border-color: #667eea;
+  background: #f0f4ff;
+}
+
+.import-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #fef3c7;
+  border-radius: 10px;
+  color: #92400e;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.import-result {
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.import-result.success {
+  background: #d1fae5;
+  border: 1px solid #6ee7b7;
+  color: #065f46;
+}
+
+.import-result.error {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
 }
 </style>

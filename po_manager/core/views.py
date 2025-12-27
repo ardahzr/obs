@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from rest_framework import viewsets, status
-from rest_framework.decorators import api_view, action
+from rest_framework.decorators import api_view, action, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Avg, Sum, F, Q
@@ -8,10 +8,12 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 from django.utils import timezone
+from collections import Counter
+import pandas as pd
 
 from .models import (
     Course, ProgramOutcome, LearningOutcome, 
-    LoToPoMapping, Student, Assessment, AssessmentToLoMapping, Grade, UserProfile, Notification
+    LoToPoMapping, Student, Assessment, AssessmentToLoMapping, Grade, UserProfile, Notification, Enrollment
 )
 from .serializers import (
     CourseSerializer, CourseDetailSerializer, ProgramOutcomeSerializer,
@@ -206,6 +208,14 @@ class StudentViewSet(viewsets.ModelViewSet):
     """Öğrenci CRUD işlemleri"""
     queryset = Student.objects.all()
     serializer_class = StudentSerializer
+    
+    def get_queryset(self):
+        """Ders bazında filtreleme desteği"""
+        queryset = Student.objects.all()
+        course_id = self.request.query_params.get('course')
+        if course_id:
+            queryset = queryset.filter(enrollments__course_id=course_id)
+        return queryset.distinct()
     
     @action(detail=True, methods=['get'])
     def grades(self, request, pk=None):
@@ -539,4 +549,4 @@ def reject_course(request, course_id):
             'approval_status': 'rejected'
         })
     except Course.DoesNotExist:
-        return Response({'success': False, 'message': 'Course not found'}, status=404)
+        return Response({'success': False, 'message': 'Ders bulunamadı'}, status=404)

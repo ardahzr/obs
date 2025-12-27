@@ -5,9 +5,24 @@
         <h2>Students</h2>
         <p class="subtitle">Manage student records and track PO scores</p>
       </div>
-      <button @click="showAddModal = true" class="btn-primary">
-        <span class="icon">+</span> Add New Student
-      </button>
+      <div class="header-actions">
+        <select v-model="selectedCourseId" @change="loadStudents" class="course-select">
+          <option :value="null">All Courses</option>
+          <option v-for="course in courses" :key="course.id" :value="course.id">
+            {{ course.code }} - {{ course.name }}
+          </option>
+        </select>
+        <button @click="showImportModal = true" class="btn-secondary">
+          <span class="icon">📥</span> Import from Excel
+        </button>
+        <button @click="showAddModal = true" class="btn-primary">
+          <span class="icon">+</span> Add New Student
+        </button>
+      </div>
+    </div>
+
+    <div v-if="students.length === 0" class="empty-state">
+      <p>{{ selectedCourseId ? 'Bu derste kayıtlı öğrenci yok.' : 'Henüz öğrenci eklenmemiş.' }}</p>
     </div>
 
     <div class="students-list">
@@ -75,6 +90,56 @@
         </form>
       </div>
     </div>
+
+    <!-- Import Excel Modal -->
+    <div v-if="showImportModal" class="modal-overlay" @click="showImportModal = false">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Import Students from OBS Excel</h3>
+          <button @click="showImportModal = false" class="btn-close">×</button>
+        </div>
+        <form @submit.prevent="handleImport" class="modal-body">
+          <div class="form-group">
+            <label>Excel File (.xlsx)</label>
+            <input type="file" accept=".xlsx,.xls" @change="onFileChange" required>
+          </div>
+          <div class="form-group">
+            <label>Select Existing Course (or leave empty to create new)</label>
+            <select v-model="importData.courseId" class="course-select">
+              <option :value="null">-- Create New Course --</option>
+              <option v-for="course in courses" :key="course.id" :value="course.id">
+                {{ course.code }} - {{ course.name }}
+              </option>
+            </select>
+          </div>
+          <div v-if="!importData.courseId" class="new-course-fields">
+            <div class="form-group">
+              <label>Course Code</label>
+              <input v-model="importData.courseCode" type="text" placeholder="e.g., CSE311 (auto-detect from Excel if empty)">
+            </div>
+            <div class="form-group">
+              <label>Course Name</label>
+              <input v-model="importData.courseName" type="text" placeholder="e.g., Operating Systems">
+            </div>
+          </div>
+          <div v-if="importResult" class="import-result" :class="importResult.success ? 'success' : 'error'">
+            <p v-if="importResult.success">
+              ✅ Course: {{ importResult.course }} ({{ importResult.course_created ? 'created' : 'existed' }})<br>
+              Students: {{ importResult.students_created }} created, {{ importResult.students_skipped }} skipped<br>
+              Assessments: {{ importResult.assessments_created || 0 }} created<br>
+              Grades: {{ importResult.grades_created || 0 }} imported
+            </p>
+            <p v-else>❌ {{ importResult.message }}</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" @click="showImportModal = false" class="btn-secondary">Close</button>
+            <button type="submit" class="btn-primary" :disabled="importing">
+              {{ importing ? 'Importing...' : 'Import' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -83,9 +148,20 @@ import { ref, onMounted } from 'vue'
 import api from '../services/api'
 
 const students = ref([])
+const courses = ref([])
+const selectedCourseId = ref(null)
 const poScores = ref([])
 const selectedStudentId = ref(null)
 const showAddModal = ref(false)
+const showImportModal = ref(false)
+const importing = ref(false)
+const importResult = ref(null)
+const importData = ref({
+  file: null,
+  courseId: null,
+  courseCode: '',
+  courseName: ''
+})
 const newStudent = ref({
   first_name: '',
   last_name: '',
@@ -93,9 +169,22 @@ const newStudent = ref({
   student_number: ''
 })
 
+async function loadCourses() {
+  try {
+    const response = await api.getCourses()
+    courses.value = response.data
+  } catch (error) {
+    console.error('Error loading courses:', error)
+  }
+}
+
 async function loadStudents() {
   try {
-    const response = await api.getStudents()
+    let url = 'students/'
+    if (selectedCourseId.value) {
+      url += `?course=${selectedCourseId.value}`
+    }
+    const response = await api.get(url)
     students.value = response.data
   } catch (error) {
     console.error('Error loading students:', error)
@@ -128,6 +217,35 @@ async function addStudent() {
   } catch (error) {
     console.error('Error adding student:', error)
     alert('Failed to add student')
+  }
+}
+
+function onFileChange(e) {
+  importData.value.file = e.target.files[0]
+}
+
+async function handleImport() {
+  if (!importData.value.file) {
+    alert('Lütfen bir Excel dosyası seçin')
+    return
+  }
+  importing.value = true
+  importResult.value = null
+  try {
+    const res = await api.importObsExcel(
+      importData.value.file,
+      importData.value.courseId,
+      importData.value.courseCode,
+      importData.value.courseName
+    )
+    importResult.value = res.data
+    await loadCourses()
+    await loadStudents()
+  } catch (err) {
+    console.error('Import error:', err)
+    importResult.value = { success: false, message: err.response?.data?.message || 'Import başarısız' }
+  } finally {
+    importing.value = false
   }
 }
 
@@ -171,6 +289,7 @@ function getScoreColor(score) {
 }
 
 onMounted(() => {
+  loadCourses()
   loadStudents()
 })
 </script>
@@ -446,5 +565,50 @@ onMounted(() => {
   gap: 12px;
   justify-content: flex-end;
   margin-top: 24px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.import-result {
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+.import-result.success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.import-result.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.course-select {
+  padding: 10px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  min-width: 200px;
+}
+
+.course-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px dashed var(--border-color);
 }
 </style>
