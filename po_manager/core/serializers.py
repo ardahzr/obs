@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from .models import (
     Course, ProgramOutcome, LearningOutcome, 
-    LoToPoMapping, Student, Assessment, AssessmentToLoMapping, Grade, UserProfile
+    LoToPoMapping, Student, Assessment, AssessmentToLoMapping, Grade, UserProfile, Notification
 )
 
 
@@ -87,10 +87,30 @@ class RegisterSerializer(serializers.Serializer):
 class CourseSerializer(serializers.ModelSerializer):
     """Ders serializer"""
     instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    approval_status_display = serializers.CharField(source='get_approval_status_display', read_only=True)
     
     class Meta:
         model = Course
-        fields = ['id', 'code', 'name', 'semester', 'department', 'instructor', 'instructor_name']
+        fields = ['id', 'code', 'name', 'semester', 'department', 'instructor', 'instructor_name',
+                  'approval_status', 'approval_status_display', 'submitted_at', 'reviewed_at', 
+                  'reviewed_by', 'rejection_reason']
+        read_only_fields = ['approval_status', 'submitted_at', 'reviewed_at', 'reviewed_by', 'rejection_reason']
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    """Bildirim serializer"""
+    sender_name = serializers.CharField(source='sender.get_full_name', read_only=True)
+    sender_username = serializers.CharField(source='sender.username', read_only=True)
+    course_code = serializers.CharField(source='course.code', read_only=True)
+    course_name = serializers.CharField(source='course.name', read_only=True)
+    notification_type_display = serializers.CharField(source='get_notification_type_display', read_only=True)
+    
+    class Meta:
+        model = Notification
+        fields = ['id', 'recipient', 'sender', 'sender_name', 'sender_username', 
+                  'course', 'course_code', 'course_name', 'notification_type', 
+                  'notification_type_display', 'message', 'is_read', 'created_at']
+        read_only_fields = ['recipient', 'sender', 'course', 'notification_type', 'message', 'created_at']
 
 
 class ProgramOutcomeSerializer(serializers.ModelSerializer):

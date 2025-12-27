@@ -99,14 +99,26 @@
             <div class="course-badge" :style="{ background: getCardColor(index) }">
               {{ course.code }}
             </div>
-            <div class="card-actions">
-              <button @click="deleteCourse(course.id)" class="action-btn delete" title="Delete Course">
-                🗑️
-              </button>
+            <div class="header-right">
+              <!-- Approval Status Badge -->
+              <span :class="['approval-badge', course.approval_status]">
+                {{ getApprovalStatusText(course.approval_status) }}
+              </span>
+              <div class="card-actions">
+                <button @click="deleteCourse(course.id)" class="action-btn delete" title="Delete Course">
+                  🗑️
+                </button>
+              </div>
             </div>
           </div>
           
           <h3 class="course-title">{{ course.name }}</h3>
+          
+          <!-- Rejection Reason -->
+          <div v-if="course.approval_status === 'rejected' && course.rejection_reason" class="rejection-reason">
+            <span class="rejection-icon">⚠️</span>
+            <span>{{ course.rejection_reason }}</span>
+          </div>
           
           <div class="course-info">
             <div class="info-item">
@@ -143,6 +155,16 @@
         <div class="card-footer">
           <button @click="$emit('viewCourse', course.id)" class="btn-view-details">
             View Details →
+          </button>
+          <!-- Onaya Gönder butonu - sadece taslak veya reddedilmiş ise göster -->
+          <button 
+            v-if="course.approval_status === 'draft' || course.approval_status === 'rejected'"
+            @click.stop="submitForApproval(course)"
+            class="btn-submit-approval"
+            :disabled="submittingCourse === course.id"
+          >
+            <span v-if="submittingCourse === course.id" class="btn-spinner"></span>
+            <span v-else>📤 Onaya Gönder</span>
           </button>
         </div>
       </div>
@@ -202,6 +224,7 @@ const loading = ref(true)
 const showAddModal = ref(false)
 const searchQuery = ref('')
 const viewMode = ref('grid')
+const submittingCourse = ref(null)
 
 const newCourse = ref({
   code: '',
@@ -319,6 +342,43 @@ async function deleteCourse(id) {
 
 function viewCourseDetails(id) {
   console.log('View course:', id)
+}
+
+// Approval status text helper
+function getApprovalStatusText(status) {
+  const statusMap = {
+    'draft': 'Taslak',
+    'pending': 'Onay Bekliyor',
+    'approved': 'Onaylandı',
+    'rejected': 'Reddedildi'
+  }
+  return statusMap[status] || status
+}
+
+// Submit course for approval
+async function submitForApproval(course) {
+  const token = localStorage.getItem('token')
+  if (!token) {
+    alert('Lütfen giriş yapın')
+    return
+  }
+
+  submittingCourse.value = course.id
+  try {
+    const response = await api.submitCourseForApproval(token, course.id)
+    if (response.data.success) {
+      // Listeyi güncelle
+      course.approval_status = 'pending'
+      alert('Ders onaya gönderildi!')
+    } else {
+      alert(response.data.message || 'Bir hata oluştu')
+    }
+  } catch (error) {
+    console.error('Error submitting for approval:', error)
+    alert(error.response?.data?.message || 'Bir hata oluştu')
+  } finally {
+    submittingCourse.value = null
+  }
 }
 
 onMounted(() => {
@@ -901,5 +961,105 @@ onMounted(() => {
 .btn-primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* Approval Status Badge */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.approval-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.approval-badge.draft {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.approval-badge.pending {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.approval-badge.approved {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.approval-badge.rejected {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Rejection Reason */
+.rejection-reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #991b1b;
+}
+
+.rejection-icon {
+  flex-shrink: 0;
+}
+
+/* Submit for Approval Button */
+.btn-submit-approval {
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-submit-approval:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.btn-submit-approval:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 </style>

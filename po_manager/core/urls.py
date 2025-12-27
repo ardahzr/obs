@@ -20,4 +20,13 @@ urlpatterns = [
     path('auth/logout/', views.logout_view, name='logout'),
     path('auth/register/', views.register_view, name='register'),
     path('auth/me/', views.me_view, name='me'),
+    # Notification endpoints
+    path('notifications/', views.get_notifications, name='notifications'),
+    path('notifications/<int:notification_id>/read/', views.mark_notification_read, name='mark_notification_read'),
+    path('notifications/read-all/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
+    # Course approval endpoints
+    path('courses/<int:course_id>/submit-for-approval/', views.submit_course_for_approval, name='submit_for_approval'),
+    path('courses/<int:course_id>/approve/', views.approve_course, name='approve_course'),
+    path('courses/<int:course_id>/reject/', views.reject_course, name='reject_course'),
+    path('pending-approvals/', views.get_pending_approvals, name='pending_approvals'),
 ]
