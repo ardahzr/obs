@@ -89,7 +89,7 @@
                 <p class="lo-description">{{ lo.description }}</p>
                 <div class="lo-pos" v-if="getLOMappedPOs(lo.id).length > 0">
                   <span v-for="po in getLOMappedPOs(lo.id)" :key="po.id" class="po-tag">
-                    {{ po.code }} ({{ po.contribution_weight }}%)
+                    {{ po.code }} ({{ formatWeight(po.contribution_weight) }}%)
                   </span>
                 </div>
               </div>
@@ -245,7 +245,12 @@ function getAssessmentLOCount(assessmentId) {
 function getPOCoverage(poId) {
   const poMappings = mappings.value.filter(m => m.program_outcome === poId)
   if (poMappings.length === 0) return 0
-  const totalWeight = poMappings.reduce((sum, m) => sum + (m.contribution_weight || 0), 0)
+  const totalWeight = poMappings.reduce((sum, m) => {
+    const weight = m.contribution_weight || 0
+    // Convert to percentage if in decimal format
+    const normalizedWeight = weight <= 1 ? weight * 100 : weight
+    return sum + normalizedWeight
+  }, 0)
   return Math.min(totalWeight, 100)
 }
 
@@ -255,6 +260,17 @@ function getCoverageClass(poId) {
   if (coverage >= 40) return 'medium'
   if (coverage > 0) return 'low'
   return 'none'
+}
+
+// Format weight - handles both decimal (0.6) and percentage (60) formats
+function formatWeight(weight) {
+  if (weight === undefined || weight === null) return 0
+  // If weight is <= 1, it's in decimal format (0.6 means 60%)
+  // If weight is > 1, it's already in percentage format (60 means 60%)
+  if (weight <= 1) {
+    return Math.round(weight * 100)
+  }
+  return Math.round(weight)
 }
 
 function getPOMappedLOs(poId) {
@@ -272,12 +288,7 @@ function hasMapping(loId, poId) {
 function getMappingWeight(loId, poId) {
   const mapping = mappings.value.find(m => m.learning_outcome === loId && m.program_outcome === poId)
   if (!mapping) return 0
-  let weight = mapping.contribution_weight
-  // If weight is less than 1, assume it was entered as decimal and convert to percentage
-  if (weight > 0 && weight < 1) {
-    weight = weight * 100
-  }
-  return Math.round(weight)
+  return formatWeight(mapping.contribution_weight)
 }
 
 async function loadCourseData() {

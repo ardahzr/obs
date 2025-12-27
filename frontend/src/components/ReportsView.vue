@@ -77,7 +77,7 @@
               <span class="course-name">{{ course.name }}</span>
             </div>
             <div class="distribution-stats">
-              <span class="stat-pill">{{ course.learning_outcomes ? course.learning_outcomes.length : 0 }} LOs</span>
+              <span class="stat-pill">{{ course.loCount }} LOs</span>
             </div>
           </div>
         </div>

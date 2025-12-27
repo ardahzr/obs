@@ -2,18 +2,43 @@
   <div class="mapping-editor">
     <div class="editor-header">
       <div class="header-left">
-        <button @click="showForms = !showForms" class="btn-toggle">
-          {{ showForms ? '◀' : '▶' }} {{ showForms ? 'Hide' : 'Show' }} Forms
-        </button>
-        <h2>LO-PO Mapping Editor</h2>
+        <div class="header-title">
+          <span class="title-icon">🔗</span>
+          <h2>LO-PO Mapping Editor</h2>
+          <span class="title-badge" v-if="selectedCourse">Active</span>
+        </div>
       </div>
       <div class="header-actions">
-        <select v-model="selectedCourse" class="course-select">
-          <option value="">Select Course</option>
-          <option v-for="course in courses" :key="course.id" :value="course.id">
-            {{ course.code }} - {{ course.name }}
-          </option>
-        </select>
+        <div class="course-selector-wrapper">
+          <div class="course-selector" @click="showCourseDropdown = !showCourseDropdown">
+            <span class="selector-icon">📚</span>
+            <span class="selector-text">{{ selectedCourseName || 'Select a Course' }}</span>
+            <span class="selector-arrow">{{ showCourseDropdown ? '▲' : '▼' }}</span>
+          </div>
+          <div class="course-dropdown" v-if="showCourseDropdown">
+            <div class="dropdown-header">
+              <span>📖</span> Choose a course to edit mappings
+            </div>
+            <div 
+              v-for="course in courses" 
+              :key="course.id" 
+              class="dropdown-item"
+              :class="{ active: selectedCourse === course.id }"
+              @click="selectCourse(course.id)"
+            >
+              <div class="dropdown-item-main">
+                <span class="course-code-badge">{{ course.code }}</span>
+                <span class="course-name-text">{{ course.name }}</span>
+              </div>
+              <div class="dropdown-item-meta">
+                <span class="meta-tag">{{ course.semester || 'No semester' }}</span>
+              </div>
+            </div>
+            <div v-if="courses.length === 0" class="dropdown-empty">
+              No courses available
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -66,7 +91,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, provide } from 'vue';
+import { ref, onMounted, onUnmounted, watch, provide, computed } from 'vue';
 import { NodeEditor, ClassicPreset } from 'rete';
 import { AreaPlugin } from 'rete-area-plugin';
 import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
@@ -86,6 +111,7 @@ const props = defineProps({
 
 const reteContainer = ref(null);
 const selectedCourse = ref('');
+const showCourseDropdown = ref(false);
 const courses = ref([]);
 const learningOutcomes = ref([]);
 const programOutcomes = ref([]);
@@ -98,6 +124,18 @@ const newLO = ref({ code: '', description: '' });
 const newPO = ref({ code: '', description: '' });
 const newAssessment = ref({ name: '', type: 'midterm', points: 100 });
 const isRendering = ref(false);
+
+// Computed property for selected course name
+const selectedCourseName = computed(() => {
+  const course = courses.value.find(c => c.id === selectedCourse.value);
+  return course ? `${course.code} - ${course.name}` : '';
+});
+
+// Method to select course from dropdown
+const selectCourse = (courseId) => {
+  selectedCourse.value = courseId;
+  showCourseDropdown.value = false;
+};
 
 let editor = null;
 let area = null;
@@ -685,7 +723,18 @@ async function updateConnectionWeight(dbId, weight, connection) {
 provide('updateConnectionWeight', updateConnectionWeight);
 
 // Load courses on mount
+// Close dropdown when clicking outside
+const handleClickOutside = (event) => {
+  const wrapper = document.querySelector('.course-selector-wrapper');
+  if (wrapper && !wrapper.contains(event.target)) {
+    showCourseDropdown.value = false;
+  }
+};
+
 onMounted(async () => {
+  // Add click outside listener
+  document.addEventListener('click', handleClickOutside);
+  
   try {
     const response = await api.getCourses();
     courses.value = response.data;
@@ -711,6 +760,7 @@ watch(() => props.preselectedCourse, (newVal) => {
 
 // Cleanup on unmount
 onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside);
   if (area) {
     area.destroy();
   }
@@ -734,41 +784,74 @@ watch(selectedCourse, (newVal) => {
 }
 
 .editor-header {
-  background: white;
-  padding: 0.75rem 0.5rem; /* Padding azaltıldı */
-  border-bottom: 2px solid #e0e0e0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 1rem 1.5rem;
+  border-bottom: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.5rem;
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.title-icon {
+  font-size: 1.5rem;
 }
 
 .editor-header h2 {
   margin: 0;
-  color: #333;
-  font-size: 1.3rem;
+  color: white;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.title-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .btn-toggle {
-  padding: 0.5rem 1rem;
-  background: #757575;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  background: rgba(255, 255, 255, 0.2);
   color: white;
-  border: none;
-  border-radius: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 600;
-  transition: background 0.3s;
-  white-space: nowrap;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(5px);
 }
 
 .btn-toggle:hover {
-  background: #616161;
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.toggle-icon {
+  font-size: 0.8rem;
 }
 
 .header-actions {
@@ -777,12 +860,156 @@ watch(selectedCourse, (newVal) => {
   align-items: center;
 }
 
+.course-selector-wrapper {
+  position: relative;
+}
+
+.course-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: white;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  min-width: 280px;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.course-selector:hover {
+  border-color: rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.selector-icon {
+  font-size: 1.3rem;
+}
+
+.selector-text {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.selector-arrow {
+  font-size: 0.75rem;
+  color: #666;
+  transition: transform 0.3s ease;
+}
+
+.course-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 350px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  overflow: hidden;
+  animation: dropdownSlide 0.2s ease;
+}
+
+@keyframes dropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-header {
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dropdown-item {
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: all 0.2s ease;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: #f8f9ff;
+}
+
+.dropdown-item.active {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-left: 4px solid #667eea;
+}
+
+.dropdown-item-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.course-code-badge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.course-name-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.dropdown-item-meta {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: 0.5rem;
+}
+
+.meta-tag {
+  font-size: 0.75rem;
+  color: #888;
+  background: #f5f5f5;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+}
+
+.dropdown-empty {
+  padding: 2rem;
+  text-align: center;
+  color: #888;
+  font-size: 0.9rem;
+}
+
 .course-select {
-  padding: 0.5rem 1rem;
-  border: 2px solid #ddd;
+  padding: 0.6rem 1rem;
+  border: none;
   border-radius: 8px;
   font-size: 1rem;
-  min-width: 200px;
+  min-width: 250px;
+  background: transparent;
+  color: #333;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
 }
 
 .btn-save {
