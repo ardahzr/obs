@@ -138,13 +138,13 @@
             <div v-for="po in programOutcomes" :key="po.id" class="po-coverage-item">
               <div class="po-header">
                 <span class="po-code">{{ po.code }}</span>
-                <span class="po-coverage-value" :class="getCoverageClass(po.id)">
+                <span class="po-coverage-value" :style="{ color: getCoverageColor(po.id) }">
                   {{ getPOCoverage(po.id) }}%
                 </span>
               </div>
               <div class="po-description">{{ po.description }}</div>
               <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: getPOCoverage(po.id) + '%' }" :class="getCoverageClass(po.id)"></div>
+                <div class="progress-fill" :style="{ width: getPOCoverage(po.id) + '%', background: getCoverageColor(po.id) }"></div>
               </div>
               <div class="po-los" v-if="getPOMappedLOs(po.id).length > 0">
                 <span class="contributing-label">Contributing LOs:</span>
@@ -260,6 +260,32 @@ function getCoverageClass(poId) {
   if (coverage >= 40) return 'medium'
   if (coverage > 0) return 'low'
   return 'none'
+}
+
+// Get dynamic color based on percentage (red 0% -> yellow 50% -> green 100%)
+function getCoverageColor(poId) {
+  const coverage = getPOCoverage(poId)
+  if (coverage === 0) return '#9ca3af' // gray for 0%
+  
+  // Calculate RGB values for smooth gradient
+  // 0% = red (239, 68, 68), 50% = yellow (245, 158, 11), 100% = green (16, 185, 129)
+  let r, g, b
+  
+  if (coverage <= 50) {
+    // Red to Yellow (0-50%)
+    const ratio = coverage / 50
+    r = Math.round(239 + (245 - 239) * ratio)
+    g = Math.round(68 + (158 - 68) * ratio)
+    b = Math.round(68 + (11 - 68) * ratio)
+  } else {
+    // Yellow to Green (50-100%)
+    const ratio = (coverage - 50) / 50
+    r = Math.round(245 + (16 - 245) * ratio)
+    g = Math.round(158 + (185 - 158) * ratio)
+    b = Math.round(11 + (129 - 11) * ratio)
+  }
+  
+  return `rgb(${r}, ${g}, ${b})`
 }
 
 // Format weight - handles both decimal (0.6) and percentage (60) formats
