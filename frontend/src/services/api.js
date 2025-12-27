@@ -153,6 +153,45 @@ export default {
     })
   },
 
+  // Notifications
+  getNotifications(token) {
+    return api.get('notifications/', {
+      headers: { Authorization: `Token ${token}` }
+    })
+  },
+  markNotificationRead(token, notificationId) {
+    return api.post(`notifications/${notificationId}/read/`, {}, {
+      headers: { Authorization: `Token ${token}` }
+    })
+  },
+  markAllNotificationsRead(token) {
+    return api.post('notifications/read-all/', {}, {
+      headers: { Authorization: `Token ${token}` }
+    })
+  },
+
+  // Course Approval
+  submitCourseForApproval(token, courseId) {
+    return api.post(`courses/${courseId}/submit-for-approval/`, {}, {
+      headers: { Authorization: `Token ${token}` }
+    })
+  },
+  getPendingApprovals(token) {
+    return api.get('pending-approvals/', {
+      headers: { Authorization: `Token ${token}` }
+    })
+  },
+  approveCourse(token, courseId, message = '') {
+    return api.post(`courses/${courseId}/approve/`, { message }, {
+      headers: { Authorization: `Token ${token}` }
+    })
+  },
+  rejectCourse(token, courseId, reason) {
+    return api.post(`courses/${courseId}/reject/`, { reason }, {
+      headers: { Authorization: `Token ${token}` }
+    })
+  },
+
   // Raw axios methods for flexibility
   post(url, data, config) {
     return api.post(url, data, config)

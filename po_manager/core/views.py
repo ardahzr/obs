@@ -7,16 +7,17 @@ from django.db.models import Avg, Sum, F, Q
 from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
+from django.utils import timezone
 
 from .models import (
     Course, ProgramOutcome, LearningOutcome, 
-    LoToPoMapping, Student, Assessment, AssessmentToLoMapping, Grade, UserProfile
+    LoToPoMapping, Student, Assessment, AssessmentToLoMapping, Grade, UserProfile, Notification
 )
 from .serializers import (
     CourseSerializer, CourseDetailSerializer, ProgramOutcomeSerializer,
     LearningOutcomeSerializer, LoToPoMappingSerializer, StudentSerializer,
     AssessmentSerializer, AssessmentToLoMappingSerializer, GradeSerializer,
-    LoginSerializer, RegisterSerializer, UserSerializer
+    LoginSerializer, RegisterSerializer, UserSerializer, NotificationSerializer
 )
 from .chat_utils import chat_with_gemini
 
@@ -307,3 +308,235 @@ def chat_view(request):
         return Response({"response": response_text})
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============ NOTIFICATION & APPROVAL VIEWS ============
+
+def get_user_from_token(request):
+    """Token'dan kullanıcıyı al"""
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Token '):
+        return None
+    token_key = auth_header.split(' ')[1]
+    try:
+        token = Token.objects.get(key=token_key)
+        return token.user
+    except Token.DoesNotExist:
+        return None
+
+
+@api_view(['GET'])
+def get_notifications(request):
+    """Kullanıcının bildirimlerini getir"""
+    user = get_user_from_token(request)
+    if not user:
+        return Response({'success': False, 'message': 'Yetkilendirme gerekli'}, status=401)
+    
+    notifications = Notification.objects.filter(recipient=user).order_by('-created_at')
+    serializer = NotificationSerializer(notifications, many=True)
+    
+    unread_count = notifications.filter(is_read=False).count()
+    
+    return Response({
+        'success': True,
+        'notifications': serializer.data,
+        'unread_count': unread_count
+    })
+
+
+@api_view(['POST'])
+def mark_notification_read(request, notification_id):
+    """Bildirimi okundu olarak işaretle"""
+    user = get_user_from_token(request)
+    if not user:
+        return Response({'success': False, 'message': 'Yetkilendirme gerekli'}, status=401)
+    
+    try:
+        notification = Notification.objects.get(id=notification_id, recipient=user)
+        notification.is_read = True
+        notification.save()
+        return Response({'success': True, 'message': 'Bildirim okundu olarak işaretlendi'})
+    except Notification.DoesNotExist:
+        return Response({'success': False, 'message': 'Bildirim bulunamadı'}, status=404)
+
+
+@api_view(['POST'])
+def mark_all_notifications_read(request):
+    """Tüm bildirimleri okundu olarak işaretle"""
+    user = get_user_from_token(request)
+    if not user:
+        return Response({'success': False, 'message': 'Yetkilendirme gerekli'}, status=401)
+    
+    Notification.objects.filter(recipient=user, is_read=False).update(is_read=True)
+    return Response({'success': True, 'message': 'Tüm bildirimler okundu olarak işaretlendi'})
+
+
+@api_view(['POST'])
+def submit_course_for_approval(request, course_id):
+    """Dersi onaya gönder (Instructor)"""
+    user = get_user_from_token(request)
+    if not user:
+        return Response({'success': False, 'message': 'Yetkilendirme gerekli'}, status=401)
+    
+    try:
+        course = Course.objects.get(id=course_id)
+        
+        # Ders sahibi kontrolü - instructor atanmamışsa veya kullanıcı instructor ise veya admin ise izin ver
+        is_admin = hasattr(user, 'profile') and user.profile.user_type == 'admin'
+        is_owner = course.instructor == user or course.instructor is None
+        
+        if not is_owner and not is_admin:
+            return Response({'success': False, 'message': 'Bu dersi onaya gönderme yetkiniz yok'}, status=403)
+        
+        # Zaten onay bekliyor mu kontrol et
+        if course.approval_status == 'pending':
+            return Response({'success': False, 'message': 'Bu ders zaten onay bekliyor'}, status=400)
+        
+        # Eğer instructor atanmamışsa, gönderen kullanıcıyı instructor olarak ata
+        if course.instructor is None:
+            course.instructor = user
+        
+        # Dersi onaya gönder
+        course.approval_status = 'pending'
+        course.submitted_at = timezone.now()
+        course.save()
+        
+        # Tüm admin kullanıcılarına bildirim gönder
+        admins = User.objects.filter(profile__user_type='admin')
+        for admin in admins:
+            Notification.objects.create(
+                recipient=admin,
+                sender=user,
+                course=course,
+                notification_type='approval_request',
+                message=f'{user.get_full_name() or user.username} "{course.code} - {course.name}" dersini onayınıza sundu.'
+            )
+        
+        return Response({
+            'success': True, 
+            'message': 'Ders onaya gönderildi',
+            'approval_status': 'pending'
+        })
+    except Course.DoesNotExist:
+        return Response({'success': False, 'message': 'Ders bulunamadı'}, status=404)
+
+
+@api_view(['GET'])
+def get_pending_approvals(request):
+    """Bekleyen onayları getir (Admin)"""
+    user = get_user_from_token(request)
+    if not user:
+        return Response({'success': False, 'message': 'Yetkilendirme gerekli'}, status=401)
+    
+    # Admin kontrolü
+    try:
+        if user.profile.user_type != 'admin':
+            return Response({'success': False, 'message': 'Admin yetkisi gerekli'}, status=403)
+    except UserProfile.DoesNotExist:
+        return Response({'success': False, 'message': 'Admin yetkisi gerekli'}, status=403)
+    
+    pending_courses = Course.objects.filter(approval_status='pending').select_related('instructor')
+    serializer = CourseSerializer(pending_courses, many=True)
+    
+    return Response({
+        'success': True,
+        'pending_courses': serializer.data
+    })
+
+
+@api_view(['POST'])
+def approve_course(request, course_id):
+    """Dersi onayla (Admin)"""
+    user = get_user_from_token(request)
+    if not user:
+        return Response({'success': False, 'message': 'Yetkilendirme gerekli'}, status=401)
+    
+    # Admin kontrolü
+    try:
+        if user.profile.user_type != 'admin':
+            return Response({'success': False, 'message': 'Admin yetkisi gerekli'}, status=403)
+    except UserProfile.DoesNotExist:
+        return Response({'success': False, 'message': 'Admin yetkisi gerekli'}, status=403)
+    
+    message = request.data.get('message', 'Dersiniz onaylandı.')
+    
+    try:
+        course = Course.objects.get(id=course_id)
+        
+        if course.approval_status != 'pending':
+            return Response({'success': False, 'message': 'Bu ders onay bekliyor durumunda değil'}, status=400)
+        
+        # Dersi onayla
+        course.approval_status = 'approved'
+        course.reviewed_at = timezone.now()
+        course.reviewed_by = user
+        course.rejection_reason = None
+        course.save()
+        
+        # Ders sahibine bildirim gönder
+        if course.instructor:
+            Notification.objects.create(
+                recipient=course.instructor,
+                sender=user,
+                course=course,
+                notification_type='approved',
+                message=f'"{course.code} - {course.name}" dersiniz onaylandı. {message}'
+            )
+        
+        return Response({
+            'success': True,
+            'message': 'Ders onaylandı',
+            'approval_status': 'approved'
+        })
+    except Course.DoesNotExist:
+        return Response({'success': False, 'message': 'Ders bulunamadı'}, status=404)
+
+
+@api_view(['POST'])
+def reject_course(request, course_id):
+    """Dersi reddet (Admin)"""
+    user = get_user_from_token(request)
+    if not user:
+        return Response({'success': False, 'message': 'Yetkilendirme gerekli'}, status=401)
+    
+    # Admin kontrolü
+    try:
+        if user.profile.user_type != 'admin':
+            return Response({'success': False, 'message': 'Admin yetkisi gerekli'}, status=403)
+    except UserProfile.DoesNotExist:
+        return Response({'success': False, 'message': 'Admin yetkisi gerekli'}, status=403)
+    
+    reason = request.data.get('reason', '')
+    if not reason:
+        return Response({'success': False, 'message': 'Red sebebi gerekli'}, status=400)
+    
+    try:
+        course = Course.objects.get(id=course_id)
+        
+        if course.approval_status != 'pending':
+            return Response({'success': False, 'message': 'Bu ders onay bekliyor durumunda değil'}, status=400)
+        
+        # Dersi reddet
+        course.approval_status = 'rejected'
+        course.reviewed_at = timezone.now()
+        course.reviewed_by = user
+        course.rejection_reason = reason
+        course.save()
+        
+        # Ders sahibine bildirim gönder
+        if course.instructor:
+            Notification.objects.create(
+                recipient=course.instructor,
+                sender=user,
+                course=course,
+                notification_type='rejected',
+                message=f'"{course.code} - {course.name}" dersiniz reddedildi. Sebep: {reason}'
+            )
+        
+        return Response({
+            'success': True,
+            'message': 'Ders reddedildi',
+            'approval_status': 'rejected'
+        })
+    except Course.DoesNotExist:
+        return Response({'success': False, 'message': 'Ders bulunamadı'}, status=404)

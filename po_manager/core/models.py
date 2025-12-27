@@ -27,11 +27,23 @@ class UserProfile(models.Model):
 
 class Course(models.Model):
     """Ders modeli - CSE311, CSE321 gibi dersler"""
+    APPROVAL_STATUS = [
+        ('draft', 'Taslak'),
+        ('pending', 'Onay Bekliyor'),
+        ('approved', 'Onaylandı'),
+        ('rejected', 'Reddedildi'),
+    ]
+    
     code = models.CharField(max_length=16, unique=True)
     name = models.CharField(max_length=200)
     semester = models.CharField(max_length=20, blank=True)
     department = models.CharField(max_length=100, default='CSE')
     instructor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    approval_status = models.CharField(max_length=20, choices=APPROVAL_STATUS, default='draft')
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_courses')
+    rejection_reason = models.TextField(blank=True, null=True)
     
     def __str__(self):
         return f"{self.code} - {self.name}"
@@ -153,3 +165,26 @@ class Grade(models.Model):
         if self.assessment.total_points > 0:
             return (self.points / self.assessment.total_points) * 100
         return 0
+
+
+class Notification(models.Model):
+    """Bildirim modeli - Onay istekleri ve sonuçları"""
+    NOTIFICATION_TYPES = [
+        ('approval_request', 'Onay İsteği'),
+        ('approved', 'Onaylandı'),
+        ('rejected', 'Reddedildi'),
+    ]
+    
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_notifications')
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='notifications')
+    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.get_notification_type_display()} - {self.course.code} → {self.recipient.username}"
+    
+    class Meta:
+        ordering = ['-created_at']

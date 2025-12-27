@@ -63,9 +63,21 @@
             <span class="nav-icon">📈</span>
             <span class="nav-text">Reports</span>
           </button>
+
+          <!-- Admin için Onaylar butonu -->
+          <button 
+            v-if="currentUser?.user_type === 'admin'"
+            :class="['nav-item', { active: currentView === 'approvals' }]" 
+            @click="currentView = 'approvals'">
+            <span class="nav-icon">📋</span>
+            <span class="nav-text">Onaylar</span>
+          </button>
         </nav>
 
         <div class="navbar-right">
+          <!-- Bildirim Dropdown -->
+          <NotificationDropdown @view-approvals="currentView = 'approvals'" />
+          
           <div class="user-menu">
             <div class="user-info" @click="showUserMenu = !showUserMenu">
               <div class="user-avatar">{{ userInitials }}</div>
@@ -108,6 +120,7 @@
         </div>
         <StudentsView v-else-if="currentView === 'students'" />
         <ReportsView v-else-if="currentView === 'reports'" />
+        <ApprovalsView v-else-if="currentView === 'approvals'" />
       </main>
     </template>
   </div>
@@ -124,6 +137,8 @@ import LearningOutcomesView from './components/LearningOutcomesView.vue'
 import StudentsView from './components/StudentsView.vue'
 import ReportsView from './components/ReportsView.vue'
 import LoginView from './components/LoginView.vue'
+import NotificationDropdown from './components/NotificationDropdown.vue'
+import ApprovalsView from './components/ApprovalsView.vue'
 import api from './services/api'
 
 const currentView = ref('dashboard')
