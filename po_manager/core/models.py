@@ -153,3 +153,17 @@ class Grade(models.Model):
         if self.assessment.total_points > 0:
             return (self.points / self.assessment.total_points) * 100
         return 0
+
+
+class Enrollment(models.Model):
+    """Öğrenci-Ders kayıt ilişkisi"""
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='enrollments')
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='enrollments')
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.student.student_no} - {self.course.code}"
+    
+    class Meta:
+        unique_together = ['student', 'course']
+        ordering = ['course', 'student']

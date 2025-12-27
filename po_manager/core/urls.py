@@ -15,6 +15,7 @@ router.register(r'grades', views.GradeViewSet)
 urlpatterns = [
     path('', include(router.urls)),
     path('chat/', views.chat_view, name='chat'),
+    path('import-obs-excel/', views.import_obs_excel, name='import-obs-excel'),
     # Auth endpoints
     path('auth/login/', views.login_view, name='login'),
     path('auth/logout/', views.logout_view, name='logout'),

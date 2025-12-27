@@ -153,6 +153,22 @@ export default {
     })
   },
 
+  // OBS Excel Import
+  importObsExcel(file, courseId, courseCode, courseName) {
+    const token = localStorage.getItem('token')
+    const formData = new FormData()
+    formData.append('file', file)
+    if (courseId) formData.append('course_id', courseId)
+    if (courseCode) formData.append('course_code', courseCode)
+    if (courseName) formData.append('course_name', courseName)
+    return api.post('import-obs-excel/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Authorization: `Token ${token}`
+      }
+    })
+  },
+
   // Raw axios methods for flexibility
   post(url, data, config) {
     return api.post(url, data, config)
