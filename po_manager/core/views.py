@@ -882,22 +882,31 @@ def import_obs_excel(request):
             last_name = ''
         
         # Öğrenci oluştur veya güncelle
-        student, created = Student.objects.get_or_create(
-            student_no=student_no,
-            defaults={
-                'first_name': first_name,
-                'last_name': last_name
-            }
-        )
-        
-        if created:
-            created_students += 1
-        else:
+        try:
+            student = Student.objects.get(student_no=student_no)
+            # Mevcut öğrenciyi güncelle
             if first_name and last_name:
-                student.first_name = first_name
-                student.last_name = last_name
-                student.save()
+                student.user.first_name = first_name
+                student.user.last_name = last_name
+                student.user.save()
             updated_students += 1
+        except Student.DoesNotExist:
+            # Yeni kullanıcı ve öğrenci oluştur
+            username = f"student_{student_no}"
+            user, _ = User.objects.get_or_create(
+                username=username,
+                defaults={
+                    'first_name': first_name or 'Öğrenci',
+                    'last_name': last_name or student_no,
+                    'email': f"{student_no}@student.edu"
+                }
+            )
+            student = Student.objects.create(
+                user=user,
+                student_no=student_no,
+                department='CSE'
+            )
+            created_students += 1
         
         # Enrollment oluştur
         Enrollment.objects.get_or_create(student=student, course=course)

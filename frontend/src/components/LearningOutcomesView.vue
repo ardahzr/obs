@@ -15,14 +15,32 @@
         </div>
       </div>
       <div class="header-actions">
-        <div class="course-selector">
-          <label>Course</label>
-          <select v-model="selectedCourse" class="select-input">
-            <option value="">Choose a course...</option>
-            <option v-for="course in courses" :key="course.id" :value="course.id">
-              {{ course.code }} - {{ course.name }}
-            </option>
-          </select>
+        <div class="course-selector-wrapper">
+          <div class="course-selector" @click="showCourseDropdown = !showCourseDropdown">
+            <span class="selector-icon">📚</span>
+            <span class="selector-text">{{ selectedCourseName || 'Select a Course' }}</span>
+            <span class="selector-arrow">{{ showCourseDropdown ? '▲' : '▼' }}</span>
+          </div>
+          <div class="course-dropdown" v-if="showCourseDropdown">
+            <div class="dropdown-header">
+              <span>📖</span> Choose a course
+            </div>
+            <div 
+              v-for="course in courses" 
+              :key="course.id" 
+              class="dropdown-item"
+              :class="{ active: selectedCourse === course.id }"
+              @click="selectCourseItem(course.id)"
+            >
+              <div class="dropdown-item-main">
+                <span class="course-code-badge">{{ course.code }}</span>
+                <span class="course-name-text">{{ course.name }}</span>
+              </div>
+            </div>
+            <div v-if="courses.length === 0" class="dropdown-empty">
+              No courses available
+            </div>
+          </div>
         </div>
         <button @click="openAddModal" class="btn-add" :disabled="!selectedCourse">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -149,6 +167,7 @@ import api from '../services/api'
 const courses = ref([])
 const outcomes = ref([])
 const selectedCourse = ref('')
+const showCourseDropdown = ref(false)
 const showModal = ref(false)
 const isEditing = ref(false)
 const formData = ref({
@@ -170,6 +189,16 @@ const accentColors = [
 
 function getAccentColor(index) {
   return accentColors[index % accentColors.length]
+}
+
+const selectedCourseName = computed(() => {
+  const course = courses.value.find(c => c.id === selectedCourse.value)
+  return course ? `${course.code} - ${course.name}` : ''
+})
+
+function selectCourseItem(courseId) {
+  selectedCourse.value = courseId
+  showCourseDropdown.value = false
 }
 
 const filteredOutcomes = computed(() => {
@@ -249,8 +278,17 @@ async function deleteOutcome(id) {
   }
 }
 
+// Close dropdown when clicking outside
+function handleClickOutside(event) {
+  const wrapper = document.querySelector('.course-selector-wrapper')
+  if (wrapper && !wrapper.contains(event.target)) {
+    showCourseDropdown.value = false
+  }
+}
+
 onMounted(() => {
   loadData()
+  document.addEventListener('click', handleClickOutside)
 })
 </script>
 
@@ -305,45 +343,131 @@ onMounted(() => {
 
 .header-actions {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 16px;
+}
+
+.course-selector-wrapper {
+  position: relative;
 }
 
 .course-selector {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.course-selector label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.select-input {
-  padding: 12px 16px;
-  padding-right: 40px;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  font-size: 15px;
-  min-width: 280px;
+  align-items: center;
+  gap: 0.75rem;
   background: white;
-  color: #334155;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   cursor: pointer;
-  transition: all 0.2s;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
+  min-width: 280px;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
 }
 
-.select-input:focus {
-  outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+.course-selector:hover {
+  border-color: rgba(139, 92, 246, 0.3);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.selector-icon {
+  font-size: 1.3rem;
+}
+
+.selector-text {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.selector-arrow {
+  font-size: 0.75rem;
+  color: #666;
+  transition: transform 0.3s ease;
+}
+
+.course-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 350px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  overflow: hidden;
+  animation: dropdownSlide 0.2s ease;
+}
+
+@keyframes dropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-header {
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dropdown-item {
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: all 0.2s ease;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: #f8f9ff;
+}
+
+.dropdown-item.active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+  border-left: 4px solid #6366f1;
+}
+
+.dropdown-item-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.course-code-badge {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.course-name-text {
+  font-size: 0.95rem;
+  color: #333;
+  font-weight: 500;
+}
+
+.dropdown-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: #888;
+  font-style: italic;
 }
 
 .btn-add {
