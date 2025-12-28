@@ -21,6 +21,8 @@ urlpatterns = [
     path('auth/logout/', views.logout_view, name='logout'),
     path('auth/register/', views.register_view, name='register'),
     path('auth/me/', views.me_view, name='me'),
+    # Admin - Instructor management
+    path('admin/create-instructor/', views.create_instructor, name='create_instructor'),
     # Notification endpoints
     path('notifications/', views.get_notifications, name='notifications'),
     path('notifications/<int:notification_id>/read/', views.mark_notification_read, name='mark_notification_read'),

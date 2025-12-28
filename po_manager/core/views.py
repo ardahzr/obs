@@ -176,6 +176,145 @@ def me_view(request):
         }, status=status.HTTP_401_UNAUTHORIZED)
 
 
+@api_view(['POST'])
+def create_instructor(request):
+    """
+    Admin tarafından instructor hesabı oluştur.
+    Rastgele şifre oluşturur ve email ile gönderir.
+    """
+    import secrets
+    import string
+    
+    user = get_user_from_token(request)
+    if not user:
+        return Response({'success': False, 'message': 'Yetkilendirme gerekli'}, status=401)
+    
+    # Admin kontrolü
+    try:
+        if user.profile.user_type != 'admin':
+            return Response({'success': False, 'message': 'Admin yetkisi gerekli'}, status=403)
+    except UserProfile.DoesNotExist:
+        return Response({'success': False, 'message': 'Admin yetkisi gerekli'}, status=403)
+    
+    # Gerekli alanları al
+    username = request.data.get('username', '').strip()
+    email = request.data.get('email', '').strip()
+    first_name = request.data.get('first_name', '').strip()
+    last_name = request.data.get('last_name', '').strip()
+    
+    if not username or not email:
+        return Response({
+            'success': False,
+            'message': 'Kullanıcı adı ve email zorunludur'
+        }, status=400)
+    
+    # Kullanıcı adı veya email zaten var mı kontrol et
+    if User.objects.filter(username=username).exists():
+        return Response({
+            'success': False,
+            'message': 'Bu kullanıcı adı zaten kullanılıyor'
+        }, status=400)
+    
+    if User.objects.filter(email=email).exists():
+        return Response({
+            'success': False,
+            'message': 'Bu email adresi zaten kullanılıyor'
+        }, status=400)
+    
+    # Rastgele şifre oluştur (12 karakter)
+    alphabet = string.ascii_letters + string.digits + "!@#$%"
+    password = ''.join(secrets.choice(alphabet) for _ in range(12))
+    
+    # Kullanıcı oluştur
+    new_user = User.objects.create_user(
+        username=username,
+        email=email,
+        password=password,
+        first_name=first_name,
+        last_name=last_name
+    )
+    
+    # UserProfile oluştur (instructor olarak)
+    UserProfile.objects.create(user=new_user, user_type='instructor')
+    
+    # Email gönder
+    from django.core.mail import send_mail
+    from django.conf import settings as django_settings
+    
+    try:
+        html_message = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 10px 10px 0 0; text-align: center; }}
+                .content {{ background: #f9fafb; padding: 25px; border: 1px solid #e5e7eb; }}
+                .credentials {{ background: #1a1a2e; color: #fff; padding: 20px; border-radius: 10px; margin: 20px 0; }}
+                .credentials p {{ margin: 10px 0; }}
+                .label {{ color: #a0aec0; font-size: 12px; }}
+                .value {{ font-size: 18px; font-weight: bold; color: #667eea; }}
+                .footer {{ background: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 10px 10px; }}
+                .warning {{ background: #fef3c7; border: 1px solid #f59e0b; padding: 12px; border-radius: 8px; margin-top: 15px; color: #92400e; font-size: 13px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1 style="margin: 0;">🎓 PO Manager</h1>
+                    <p style="margin: 5px 0 0 0; opacity: 0.9;">Program Outcome Management System</p>
+                </div>
+                <div class="content">
+                    <h2>Hoş Geldiniz, {first_name or username}!</h2>
+                    <p>PO Manager sistemine instructor olarak kaydınız oluşturulmuştur. Aşağıdaki bilgilerle giriş yapabilirsiniz:</p>
+                    
+                    <div class="credentials">
+                        <p><span class="label">KULLANICI ADI</span><br><span class="value">{username}</span></p>
+                        <p><span class="label">ŞİFRE</span><br><span class="value">{password}</span></p>
+                    </div>
+                    
+                    <div class="warning">
+                        ⚠️ Güvenliğiniz için ilk girişten sonra şifrenizi değiştirmenizi öneririz.
+                    </div>
+                </div>
+                <div class="footer">
+                    <p>Bu email PO Manager sistemi tarafından otomatik olarak gönderilmiştir.</p>
+                    <p>© 2025 PO Manager - Program Outcome Management System</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        send_mail(
+            subject='🎓 PO Manager - Hesap Bilgileriniz',
+            message=f'Kullanıcı adı: {username}\nŞifre: {password}',
+            from_email=django_settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        email_sent = True
+    except Exception as e:
+        print(f"Email gönderme hatası: {e}")
+        email_sent = False
+    
+    return Response({
+        'success': True,
+        'message': 'Instructor hesabı başarıyla oluşturuldu',
+        'email_sent': email_sent,
+        'user': {
+            'id': new_user.id,
+            'username': new_user.username,
+            'email': new_user.email,
+            'first_name': new_user.first_name,
+            'last_name': new_user.last_name,
+            'user_type': 'instructor'
+        }
+    }, status=201)
+
+
 class CourseViewSet(viewsets.ModelViewSet):
     """Ders CRUD işlemleri"""
     queryset = Course.objects.all()

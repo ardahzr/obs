@@ -206,6 +206,13 @@ export default {
     })
   },
 
+  // Admin - Instructor Management
+  createInstructor(token, data) {
+    return api.post('admin/create-instructor/', data, {
+      headers: { Authorization: `Token ${token}` }
+    })
+  },
+
   // OBS Excel Import
   importObsExcel(file, courseId, courseCode, courseName) {
     const token = localStorage.getItem('token')

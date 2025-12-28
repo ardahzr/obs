@@ -1,22 +1,41 @@
 <template>
   <div class="approvals-container">
     <div class="page-header">
-      <h1>📋 Pending Approvals</h1>
-      <p class="subtitle">Course approval requests from faculty members</p>
+      <h1>�️ Admin Panel</h1>
+      <p class="subtitle">Manage approvals and users</p>
     </div>
 
-    <div v-if="loading" class="loading-state">
-      <span class="loading-spinner"></span>
-      <p>Loading...</p>
+    <!-- Tab Navigation -->
+    <div class="admin-tabs">
+      <button 
+        :class="['tab-btn', { active: activeTab === 'approvals' }]"
+        @click="activeTab = 'approvals'"
+      >
+        <span>📋</span> Pending Approvals
+        <span v-if="pendingCourses.length > 0" class="tab-badge">{{ pendingCourses.length }}</span>
+      </button>
+      <button 
+        :class="['tab-btn', { active: activeTab === 'instructors' }]"
+        @click="activeTab = 'instructors'"
+      >
+        <span>👨‍🏫</span> Instructor Management
+      </button>
     </div>
 
-    <div v-else-if="pendingCourses.length === 0" class="empty-state">
-      <span class="empty-icon">✅</span>
-      <h3>No Pending Approvals</h3>
-      <p>There are no courses waiting for approval.</p>
-    </div>
+    <!-- Approvals Tab Content -->
+    <div v-if="activeTab === 'approvals'" class="tab-content">
+      <div v-if="loading" class="loading-state">
+        <span class="loading-spinner"></span>
+        <p>Loading...</p>
+      </div>
 
-    <div v-else class="approvals-grid">
+      <div v-else-if="pendingCourses.length === 0" class="empty-state">
+        <span class="empty-icon">✅</span>
+        <h3>No Pending Approvals</h3>
+        <p>There are no courses waiting for approval.</p>
+      </div>
+
+      <div v-else class="approvals-grid">
       <div v-for="course in pendingCourses" :key="course.id" class="approval-card">
         <div class="card-header">
           <div class="course-info">
@@ -53,6 +72,85 @@
             <span>❌</span> Reject
           </button>
         </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- Instructor Management Tab Content -->
+    <div v-if="activeTab === 'instructors'" class="tab-content">
+      <div class="instructor-section">
+        <div class="section-header">
+          <h2>👨‍🏫 Create New Instructor Account</h2>
+          <p>Create a new instructor account. A random password will be generated and sent to the instructor's email.</p>
+        </div>
+
+        <form @submit.prevent="createInstructor" class="instructor-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Username <span class="required">*</span></label>
+              <input 
+                v-model="newInstructor.username" 
+                type="text" 
+                placeholder="e.g. johndoe"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>Email <span class="required">*</span></label>
+              <input 
+                v-model="newInstructor.email" 
+                type="email" 
+                placeholder="e.g. john.doe@university.edu"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>First Name <span class="required">*</span></label>
+              <input 
+                v-model="newInstructor.first_name" 
+                type="text" 
+                placeholder="e.g. John"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>Last Name <span class="required">*</span></label>
+              <input 
+                v-model="newInstructor.last_name" 
+                type="text" 
+                placeholder="e.g. Doe"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Department</label>
+              <input 
+                v-model="newInstructor.department" 
+                type="text" 
+                placeholder="e.g. Computer Science"
+              />
+            </div>
+          </div>
+
+          <div v-if="instructorError" class="error-message">
+            <span>❌</span> {{ instructorError }}
+          </div>
+
+          <div v-if="instructorSuccess" class="success-message">
+            <span>✅</span> {{ instructorSuccess }}
+          </div>
+
+          <button type="submit" class="submit-btn" :disabled="creatingInstructor">
+            <span v-if="creatingInstructor" class="btn-spinner"></span>
+            <span v-else>👤 Create Instructor Account</span>
+          </button>
+        </form>
       </div>
     </div>
 
@@ -120,6 +218,10 @@
 import { ref, onMounted } from 'vue'
 import api from '../services/api'
 
+// Tab state
+const activeTab = ref('approvals')
+
+// Approvals state
 const pendingCourses = ref([])
 const loading = ref(true)
 const actionLoading = ref(false)
@@ -130,6 +232,18 @@ const selectedCourse = ref(null)
 const approveMessage = ref('')
 const rejectReason = ref('')
 const rejectError = ref('')
+
+// Instructor management state
+const newInstructor = ref({
+  username: '',
+  email: '',
+  first_name: '',
+  last_name: '',
+  department: ''
+})
+const creatingInstructor = ref(false)
+const instructorError = ref('')
+const instructorSuccess = ref('')
 
 const fetchPendingApprovals = async () => {
   const token = localStorage.getItem('token')
@@ -145,6 +259,36 @@ const fetchPendingApprovals = async () => {
     console.error('Onaylar yüklenemedi:', err)
   } finally {
     loading.value = false
+  }
+}
+
+// Create instructor function
+const createInstructor = async () => {
+  instructorError.value = ''
+  instructorSuccess.value = ''
+  
+  const token = localStorage.getItem('token')
+  if (!token) return
+
+  creatingInstructor.value = true
+  try {
+    const response = await api.createInstructor(token, newInstructor.value)
+    if (response.data.success) {
+      instructorSuccess.value = `Instructor account created successfully! Login credentials have been sent to ${newInstructor.value.email}`
+      // Reset form
+      newInstructor.value = {
+        username: '',
+        email: '',
+        first_name: '',
+        last_name: '',
+        department: ''
+      }
+    }
+  } catch (err) {
+    console.error('Instructor creation failed:', err)
+    instructorError.value = err.response?.data?.error || 'Failed to create instructor account'
+  } finally {
+    creatingInstructor.value = false
   }
 }
 
@@ -589,5 +733,171 @@ onMounted(() => {
   border-top-color: white;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+
+/* Tab Navigation */
+.admin-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--border-color, #e5e7eb);
+  padding-bottom: 0;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  color: var(--primary-color, #3b82f6);
+}
+
+.tab-btn.active {
+  color: var(--primary-color, #3b82f6);
+  border-bottom-color: var(--primary-color, #3b82f6);
+}
+
+.tab-badge {
+  background: #ef4444;
+  color: white;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.tab-content {
+  min-height: 400px;
+}
+
+/* Instructor Management */
+.instructor-section {
+  max-width: 700px;
+}
+
+.section-header {
+  margin-bottom: 24px;
+}
+
+.section-header h2 {
+  font-size: 20px;
+  color: var(--text-primary, #1f2937);
+  margin: 0 0 8px 0;
+}
+
+.section-header p {
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+  margin: 0;
+}
+
+.instructor-form {
+  background: var(--surface-color, #f9fafb);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.instructor-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.instructor-form label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #1f2937);
+}
+
+.instructor-form input {
+  padding: 10px 14px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.instructor-form input:focus {
+  outline: none;
+  border-color: var(--primary-color, #3b82f6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.error-message {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.success-message {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #16a34a;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 12px 24px;
+  background: var(--primary-color, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: var(--primary-hover, #2563eb);
+}
+
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
