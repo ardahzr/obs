@@ -844,21 +844,38 @@ def import_obs_excel(request):
     student_no_col = None
     first_name_col = None
     last_name_col = None
+    full_name_col = None
     
     for col in df.columns:
         col_lower = col.lower()
-        if 'öğrenci no' in col_lower or 'student no' in col_lower or 'no_' in col_lower:
-            if 'öğrenci no' in col_lower or 'student' in col_lower:
+        # Öğrenci No sütunu
+        if 'öğrenci no' in col_lower or 'student no' in col_lower or 'student_no' in col_lower:
+            student_no_col = col
+        elif col_lower.startswith('no_'):
+            if not student_no_col:
                 student_no_col = col
-        elif 'adı_' in col_lower or 'first' in col_lower:
-            first_name_col = col
-        elif 'soyadı_' in col_lower or 'last' in col_lower:
+        # Soyadı sütunu (surname/last name) - önce kontrol et
+        elif 'soyadı' in col_lower or 'soyadi' in col_lower or 'surname' in col_lower or 'last_name' in col_lower or 'last name' in col_lower:
             last_name_col = col
+        # Adı sütunu (first name) - soyadı değilse
+        elif ('adı' in col_lower or 'adi' in col_lower or 'first_name' in col_lower or 'first name' in col_lower) and 'soyadı' not in col_lower and 'soyadi' not in col_lower:
+            # "Adı Soyadı" birleşik sütun kontrolü
+            if 'soyadı' in col_lower or 'soyadi' in col_lower:
+                full_name_col = col
+            else:
+                first_name_col = col
+        # Birleşik ad soyad sütunu
+        elif 'ad soyad' in col_lower or 'adsoyad' in col_lower or 'full_name' in col_lower or 'fullname' in col_lower:
+            full_name_col = col
     
     if not student_no_col:
-        # Fallback: İkinci sütunu kullan (genellikle Öğrenci No)
-        if len(df.columns) > 1:
-            student_no_col = df.columns[1]
+        # Fallback: İlk sütunda "no" geçiyorsa veya ikinci sütunu kullan
+        for col in df.columns:
+            if 'no' in col.lower():
+                student_no_col = col
+                break
+        if not student_no_col and len(df.columns) > 1:
+            student_no_col = df.columns[0]
     
     if not student_no_col:
         return Response({'success': False, 'message': 'Student ID column not found'}, status=400)
@@ -873,8 +890,24 @@ def import_obs_excel(request):
         if not student_no or student_no == 'nan':
             continue
         
-        first_name = str(row.get(first_name_col, '')).strip() if first_name_col else ''
-        last_name = str(row.get(last_name_col, '')).strip() if last_name_col else ''
+        first_name = ''
+        last_name = ''
+        
+        # Birleşik ad soyad sütunu varsa, ayır
+        if full_name_col:
+            full_name = str(row.get(full_name_col, '')).strip()
+            if full_name and full_name != 'nan':
+                # İsmi boşluktan ayır - ilk parça ad, geri kalan soyad
+                name_parts = full_name.split()
+                if len(name_parts) >= 2:
+                    first_name = name_parts[0]
+                    last_name = ' '.join(name_parts[1:])
+                elif len(name_parts) == 1:
+                    first_name = name_parts[0]
+        else:
+            # Ayrı sütunlar
+            first_name = str(row.get(first_name_col, '')).strip() if first_name_col else ''
+            last_name = str(row.get(last_name_col, '')).strip() if last_name_col else ''
         
         if first_name == 'nan':
             first_name = ''
@@ -884,10 +917,12 @@ def import_obs_excel(request):
         # Öğrenci oluştur veya güncelle
         try:
             student = Student.objects.get(student_no=student_no)
-            # Mevcut öğrenciyi güncelle
-            if first_name and last_name:
-                student.user.first_name = first_name
-                student.user.last_name = last_name
+            # Mevcut öğrenciyi güncelle - isim bilgisi varsa
+            if first_name or last_name:
+                if first_name:
+                    student.user.first_name = first_name
+                if last_name:
+                    student.user.last_name = last_name
                 student.user.save()
             updated_students += 1
         except Student.DoesNotExist:
@@ -896,8 +931,8 @@ def import_obs_excel(request):
             user, _ = User.objects.get_or_create(
                 username=username,
                 defaults={
-                    'first_name': first_name or 'Öğrenci',
-                    'last_name': last_name or student_no,
+                    'first_name': first_name or '',
+                    'last_name': last_name or '',
                     'email': f"{student_no}@student.edu"
                 }
             )

@@ -152,10 +152,10 @@
       <div v-for="(student, index) in filteredStudents" :key="student.id" class="student-card">
         <div class="card-header">
           <div class="student-avatar" :style="{ background: getAvatarColor(index) }">
-            {{ getInitials(student.user.first_name, student.user.last_name) }}
+            {{ getInitials(student.user?.first_name, student.user?.last_name) }}
           </div>
           <div class="student-info">
-            <h3>{{ student.user.first_name }} {{ student.user.last_name }}</h3>
+            <h3>{{ getStudentFullName(student) }}</h3>
             <div class="student-meta">
               <span class="student-id">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -504,8 +504,28 @@ async function handleImport() {
   }
 }
 
+function getStudentFullName(student) {
+  const firstName = student.user?.first_name || ''
+  const lastName = student.user?.last_name || ''
+  
+  if (firstName && lastName) {
+    return `${firstName} ${lastName}`
+  } else if (firstName) {
+    return firstName
+  } else if (lastName) {
+    return lastName
+  } else {
+    return `Student ${student.student_no}`
+  }
+}
+
 function getInitials(firstName, lastName) {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+  const first = (firstName || '').charAt(0)
+  const last = (lastName || '').charAt(0)
+  if (first && last) return `${first}${last}`.toUpperCase()
+  if (first) return first.toUpperCase()
+  if (last) return last.toUpperCase()
+  return '?'
 }
 
 const avatarColors = [
