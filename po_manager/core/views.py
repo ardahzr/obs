@@ -551,9 +551,33 @@ def reject_course(request, course_id):
         return Response({'success': False, 'message': 'Course not found'}, status=404)
 
 
+def detect_assessment_type(name):
+    """Assessment adından türünü tahmin et"""
+    name_lower = name.lower()
+    if 'midterm' in name_lower or 'vize' in name_lower:
+        return 'midterm'
+    elif 'final' in name_lower:
+        return 'final'
+    elif 'quiz' in name_lower:
+        return 'quiz'
+    elif 'project' in name_lower or 'proje' in name_lower:
+        return 'project'
+    elif 'homework' in name_lower or 'ödev' in name_lower:
+        return 'homework'
+    elif 'attendance' in name_lower or 'devam' in name_lower:
+        return 'homework'
+    return 'quiz'
+
+
 @api_view(['POST'])
 def import_obs_excel(request):
-    """Import student grades from OBS Excel file"""
+    """
+    OBS Excel formatından ders, öğrenci, assessment ve notları içeri aktar.
+    """
+    import pandas as pd
+    import re
+    from io import BytesIO
+    
     user = get_user_from_token(request)
     if not user:
         return Response({'success': False, 'message': 'Authorization required'}, status=401)
@@ -562,28 +586,164 @@ def import_obs_excel(request):
         return Response({'success': False, 'message': 'No file provided'}, status=400)
     
     try:
-        import pandas as pd
-        from io import BytesIO
-        
         excel_file = request.FILES['file']
         df = pd.read_excel(BytesIO(excel_file.read()))
-        
-        # Process the Excel file
-        # Expected columns: Student ID, Student Name, Grade, etc.
-        imported_count = 0
-        
-        for index, row in df.iterrows():
-            # Process each row
-            # This is a placeholder - implement based on your Excel structure
-            imported_count += 1
-        
-        return Response({
-            'success': True,
-            'message': f'Successfully imported {imported_count} records',
-            'imported_count': imported_count
-        })
     except Exception as e:
-        return Response({
-            'success': False,
-            'message': f'Error importing file: {str(e)}'
-        }, status=400)
+        return Response({'success': False, 'message': f'Excel read error: {str(e)}'}, status=400)
+    
+    # Course bilgilerini al
+    course_id = request.data.get('course_id')
+    course_code = request.data.get('course_code', '')
+    course_name = request.data.get('course_name', '')
+    
+    # Sütun isimlerinden course code çıkar (örn: "Öğrenci No_0833AB" -> "0833AB")
+    if not course_code:
+        for col in df.columns:
+            if '_' in col:
+                course_code = col.split('_')[-1]
+                break
+    
+    if not course_code:
+        return Response({'success': False, 'message': 'Course code not found'}, status=400)
+    
+    if not course_name:
+        course_name = course_code
+    
+    # Course oluştur veya bul
+    created_course = False
+    if course_id:
+        try:
+            course = Course.objects.get(id=course_id)
+        except Course.DoesNotExist:
+            return Response({'success': False, 'message': 'Course not found'}, status=404)
+    else:
+        course, created_course = Course.objects.get_or_create(
+            code=course_code,
+            defaults={
+                'name': course_name,
+                'department': 'CSE',
+                'instructor': user
+            }
+        )
+    
+    # Assessment sütunlarını tespit et: "Assessment Name(%Weight)_CourseCode"
+    assessment_pattern = re.compile(r'^(.+?)\(%(\d+)\)_')
+    assessment_columns = {}
+    
+    for col in df.columns:
+        match = assessment_pattern.match(col)
+        if match:
+            assessment_name = match.group(1).strip()
+            weight = int(match.group(2))
+            assessment_columns[col] = {
+                'name': assessment_name,
+                'weight': weight
+            }
+    
+    # Assessment'ları oluştur
+    created_assessments = 0
+    assessments_map = {}
+    
+    for col, info in assessment_columns.items():
+        assessment, created = Assessment.objects.get_or_create(
+            course=course,
+            name=info['name'],
+            defaults={
+                'assessment_type': detect_assessment_type(info['name']),
+                'total_points': 100  # Default 100 puan üzerinden
+            }
+        )
+        assessments_map[col] = assessment
+        if created:
+            created_assessments += 1
+    
+    # Öğrenci sütunlarını bul
+    student_no_col = None
+    first_name_col = None
+    last_name_col = None
+    
+    for col in df.columns:
+        col_lower = col.lower()
+        if 'öğrenci no' in col_lower or 'student no' in col_lower or 'no_' in col_lower:
+            if 'öğrenci no' in col_lower or 'student' in col_lower:
+                student_no_col = col
+        elif 'adı_' in col_lower or 'first' in col_lower:
+            first_name_col = col
+        elif 'soyadı_' in col_lower or 'last' in col_lower:
+            last_name_col = col
+    
+    if not student_no_col:
+        # Fallback: İkinci sütunu kullan (genellikle Öğrenci No)
+        if len(df.columns) > 1:
+            student_no_col = df.columns[1]
+    
+    if not student_no_col:
+        return Response({'success': False, 'message': 'Student ID column not found'}, status=400)
+    
+    # Öğrenci ve notları işle
+    created_students = 0
+    updated_students = 0
+    created_grades = 0
+    
+    for index, row in df.iterrows():
+        student_no = str(row.get(student_no_col, '')).strip()
+        if not student_no or student_no == 'nan':
+            continue
+        
+        first_name = str(row.get(first_name_col, '')).strip() if first_name_col else ''
+        last_name = str(row.get(last_name_col, '')).strip() if last_name_col else ''
+        
+        if first_name == 'nan':
+            first_name = ''
+        if last_name == 'nan':
+            last_name = ''
+        
+        # Öğrenci oluştur veya güncelle
+        student, created = Student.objects.get_or_create(
+            student_no=student_no,
+            defaults={
+                'first_name': first_name,
+                'last_name': last_name
+            }
+        )
+        
+        if created:
+            created_students += 1
+        else:
+            if first_name and last_name:
+                student.first_name = first_name
+                student.last_name = last_name
+                student.save()
+            updated_students += 1
+        
+        # Enrollment oluştur
+        Enrollment.objects.get_or_create(student=student, course=course)
+        
+        # Notları kaydet
+        for col, assessment in assessments_map.items():
+            try:
+                grade_value = row.get(col)
+                if pd.notna(grade_value):
+                    points = float(grade_value)
+                    grade, g_created = Grade.objects.get_or_create(
+                        student=student,
+                        assessment=assessment,
+                        defaults={'points': points}
+                    )
+                    if not g_created and grade.points != points:
+                        grade.points = points
+                        grade.save()
+                    if g_created:
+                        created_grades += 1
+            except (ValueError, TypeError):
+                pass
+    
+    return Response({
+        'success': True,
+        'course_code': course.code,
+        'course_created': created_course,
+        'students_created': created_students,
+        'students_updated': updated_students,
+        'assessments_created': created_assessments,
+        'grades_created': created_grades
+    })
