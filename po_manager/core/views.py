@@ -489,7 +489,7 @@ def chat_view(request):
         return Response({"error": "Message is required"}, status=status.HTTP_400_BAD_REQUEST)
     
     # API Key provided by user
-    api_key = "AIzaSyAj7cQxoREu3UEv-JU5jllTLYk6U9E6pM8"
+    api_key = "AIzaSyCe57F4V3xkEmmZQ5KQg7ksLlkv4K7cKBU"
     
     try:
         response_text = chat_with_gemini(user_message, api_key)
