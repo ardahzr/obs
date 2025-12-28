@@ -52,7 +52,12 @@
           {{ error }}
         </div>
 
-        <button type="submit" class="login-btn" :disabled="loading">
+        <!-- reCAPTCHA Widget -->
+        <div class="recaptcha-container">
+          <div id="recaptcha-widget"></div>
+        </div>
+
+        <button type="submit" class="login-btn" :disabled="loading || !recaptchaToken">
           <span v-if="loading" class="loading-spinner"></span>
           <span v-else>Giriş Yap</span>
         </button>
@@ -66,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, defineEmits } from 'vue'
+import { ref, defineEmits, onMounted } from 'vue'
 import api from '../services/api'
 
 const emit = defineEmits(['login-success'])
@@ -76,13 +81,74 @@ const password = ref('')
 const showPassword = ref(false)
 const loading = ref(false)
 const error = ref('')
+const recaptchaToken = ref('')
+
+// reCAPTCHA Site Key
+const RECAPTCHA_SITE_KEY = '6LffcTksAAAAAIB8PWS-uqaXDZ2bV1P6Lmr--0AO'
+
+// Load reCAPTCHA script
+onMounted(() => {
+  loadRecaptchaScript()
+})
+
+const loadRecaptchaScript = () => {
+  if (document.getElementById('recaptcha-script')) {
+    renderRecaptcha()
+    return
+  }
+  
+  const script = document.createElement('script')
+  script.id = 'recaptcha-script'
+  script.src = 'https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit'
+  script.async = true
+  script.defer = true
+  
+  // Define global callback
+  window.onRecaptchaLoad = () => {
+    renderRecaptcha()
+  }
+  
+  document.head.appendChild(script)
+}
+
+const renderRecaptcha = () => {
+  if (window.grecaptcha && document.getElementById('recaptcha-widget')) {
+    window.grecaptcha.render('recaptcha-widget', {
+      sitekey: RECAPTCHA_SITE_KEY,
+      callback: onRecaptchaSuccess,
+      'expired-callback': onRecaptchaExpired,
+      theme: 'dark'
+    })
+  }
+}
+
+const onRecaptchaSuccess = (token) => {
+  recaptchaToken.value = token
+}
+
+const onRecaptchaExpired = () => {
+  recaptchaToken.value = ''
+}
+
+const resetRecaptcha = () => {
+  if (window.grecaptcha) {
+    window.grecaptcha.reset()
+  }
+  recaptchaToken.value = ''
+}
 
 const handleLogin = async () => {
   error.value = ''
+  
+  if (!recaptchaToken.value) {
+    error.value = 'Lütfen reCAPTCHA doğrulamasını tamamlayın'
+    return
+  }
+  
   loading.value = true
 
   try {
-    const response = await api.login(username.value, password.value)
+    const response = await api.login(username.value, password.value, recaptchaToken.value)
 
     if (response.data.success) {
       // Token'ı localStorage'a kaydet
@@ -93,6 +159,7 @@ const handleLogin = async () => {
       emit('login-success', response.data.user)
     } else {
       error.value = response.data.message || 'Giriş başarısız'
+      resetRecaptcha()
     }
   } catch (err) {
     console.error('Login error:', err)
@@ -105,6 +172,7 @@ const handleLogin = async () => {
     } else {
       error.value = 'Bağlantı hatası. Lütfen tekrar deneyin.'
     }
+    resetRecaptcha()
   } finally {
     loading.value = false
   }
@@ -251,6 +319,18 @@ const handleLogin = async () => {
 
 .error-icon {
   font-size: 1.1rem;
+}
+
+/* reCAPTCHA Container */
+.recaptcha-container {
+  display: flex;
+  justify-content: center;
+  margin: 15px 0;
+}
+
+.recaptcha-container > div {
+  transform: scale(0.95);
+  transform-origin: center;
 }
 
 .login-btn {

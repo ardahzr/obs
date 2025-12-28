@@ -150,8 +150,8 @@ export default {
   },
 
   // Auth
-  login(username, password) {
-    return api.post('auth/login/', { username, password })
+  login(username, password, recaptcha_token = '') {
+    return api.post('auth/login/', { username, password, recaptcha_token })
   },
   logout(token) {
     return api.post('auth/logout/', {}, {
