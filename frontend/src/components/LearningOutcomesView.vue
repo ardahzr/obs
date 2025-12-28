@@ -1,41 +1,107 @@
 <template>
   <div class="learning-outcomes-view">
-    <div class="view-header">
-      <div class="header-left">
-        <h2>Learning Outcomes</h2>
-        <p class="subtitle">Manage learning outcomes for each course</p>
+    <!-- Header Section -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+          </svg>
+        </div>
+        <div class="header-text">
+          <h1>Learning Outcomes</h1>
+          <p>Define and manage course-specific learning objectives</p>
+        </div>
       </div>
       <div class="header-actions">
-        <select v-model="selectedCourse" class="course-select">
-          <option value="">Select Course</option>
-          <option v-for="course in courses" :key="course.id" :value="course.id">
-            {{ course.code }} - {{ course.name }}
-          </option>
-        </select>
-        <button @click="openAddModal" class="btn-primary" :disabled="!selectedCourse">
-          <span class="icon">+</span> Add New LO
+        <div class="course-selector">
+          <label>Course</label>
+          <select v-model="selectedCourse" class="select-input">
+            <option value="">Choose a course...</option>
+            <option v-for="course in courses" :key="course.id" :value="course.id">
+              {{ course.code }} - {{ course.name }}
+            </option>
+          </select>
+        </div>
+        <button @click="openAddModal" class="btn-add" :disabled="!selectedCourse">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Add Learning Outcome
         </button>
       </div>
     </div>
 
+    <!-- Empty State -->
     <div v-if="!selectedCourse" class="empty-state">
-      <p>📚 Please select a course to manage its Learning Outcomes</p>
+      <div class="empty-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </div>
+      <h3>Select a Course</h3>
+      <p>Choose a course from the dropdown above to view and manage its learning outcomes</p>
     </div>
 
-    <div v-else class="outcomes-list">
-      <div v-for="lo in filteredOutcomes" :key="lo.id" class="outcome-card">
-        <div class="outcome-header">
-          <div class="outcome-code">{{ lo.code }}</div>
-          <div class="outcome-actions">
-            <button @click="openEditModal(lo)" class="btn-icon" title="Edit">✏️</button>
-            <button @click="deleteOutcome(lo.id)" class="btn-icon" title="Delete">🗑️</button>
+    <!-- Outcomes Grid -->
+    <div v-else class="outcomes-container">
+      <div class="outcomes-header">
+        <div class="outcomes-count">
+          <span class="count-badge">{{ filteredOutcomes.length }}</span>
+          <span>Learning Outcome{{ filteredOutcomes.length !== 1 ? 's' : '' }}</span>
+        </div>
+      </div>
+
+      <div v-if="filteredOutcomes.length > 0" class="outcomes-grid">
+        <div v-for="(lo, index) in filteredOutcomes" :key="lo.id" class="outcome-card">
+          <div class="card-accent" :style="{ background: getAccentColor(index) }"></div>
+          <div class="card-content">
+            <div class="card-header">
+              <div class="lo-badge" :style="{ background: getAccentColor(index) + '20', color: getAccentColor(index) }">
+                {{ lo.code }}
+              </div>
+              <div class="card-actions">
+                <button @click="openEditModal(lo)" class="action-btn edit" title="Edit">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                </button>
+                <button @click="deleteOutcome(lo.id)" class="action-btn delete" title="Delete">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <p class="lo-description">{{ lo.description }}</p>
           </div>
         </div>
-        <p class="outcome-description">{{ lo.description }}</p>
       </div>
       
-      <div v-if="filteredOutcomes.length === 0" class="no-data">
-        <p>No Learning Outcomes found for this course.</p>
+      <div v-else class="no-outcomes">
+        <div class="no-outcomes-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="12" y1="18" x2="12" y2="12"></line>
+            <line x1="9" y1="15" x2="15" y2="15"></line>
+          </svg>
+        </div>
+        <h3>No Learning Outcomes Yet</h3>
+        <p>Get started by adding the first learning outcome for this course</p>
+        <button @click="openAddModal" class="btn-add-first">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Add First Learning Outcome
+        </button>
       </div>
     </div>
 
@@ -90,6 +156,21 @@ const formData = ref({
   code: '',
   description: ''
 })
+
+const accentColors = [
+  '#6366f1', // indigo
+  '#8b5cf6', // violet
+  '#ec4899', // pink
+  '#f59e0b', // amber
+  '#10b981', // emerald
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#14b8a6', // teal
+]
+
+function getAccentColor(index) {
+  return accentColors[index % accentColors.length]
+}
 
 const filteredOutcomes = computed(() => {
   if (!selectedCourse.value) return []
@@ -175,147 +256,317 @@ onMounted(() => {
 
 <style scoped>
 .learning-outcomes-view {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 32px;
 }
 
-.view-header {
+/* Page Header */
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 32px;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+  gap: 24px;
 }
 
-.header-left h2 {
+.header-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.header-icon {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+}
+
+.header-text h1 {
   font-size: 32px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 8px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
 }
 
-.subtitle {
+.header-text p {
   font-size: 16px;
-  color: var(--text-secondary);
+  color: #64748b;
+  margin: 0;
 }
 
 .header-actions {
   display: flex;
+  align-items: flex-end;
   gap: 16px;
-  align-items: center;
 }
 
-.course-select {
-  padding: 10px 16px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 16px;
-  min-width: 250px;
-  background: white;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-  color: white;
-  padding: 12px 24px;
-  border: none;
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.2s;
-  box-shadow: var(--shadow-md);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  background: #ccc;
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 60px;
-  background: white;
-  border-radius: 16px;
-  border: 2px dashed var(--border-color);
-  color: var(--text-secondary);
-  font-size: 18px;
-}
-
-.outcomes-list {
+.course-selector {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 6px;
+}
+
+.course-selector label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.select-input {
+  padding: 12px 16px;
+  padding-right: 40px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 15px;
+  min-width: 280px;
+  background: white;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.select-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+}
+
+.btn-add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+}
+
+.btn-add:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+}
+
+.btn-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #94a3b8;
+  box-shadow: none;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 80px 40px;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-radius: 24px;
+  border: 2px dashed #e2e8f0;
+}
+
+.empty-icon {
+  color: #94a3b8;
+  margin-bottom: 24px;
+}
+
+.empty-state h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #334155;
+  margin: 0 0 12px 0;
+}
+
+.empty-state p {
+  font-size: 16px;
+  color: #64748b;
+  max-width: 400px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* Outcomes Container */
+.outcomes-container {
+  background: white;
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+.outcomes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.outcomes-count {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.count-badge {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* Outcomes Grid */
+.outcomes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 24px;
 }
 
 .outcome-card {
   background: white;
-  border: 1px solid var(--border-color);
   border-radius: 16px;
-  padding: 24px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
   transition: all 0.3s;
-  box-shadow: var(--shadow-sm);
+  position: relative;
 }
 
 .outcome-card:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--primary-color);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+  border-color: transparent;
 }
 
-.outcome-header {
+.card-accent {
+  height: 4px;
+  width: 100%;
+}
+
+.card-content {
+  padding: 24px;
+}
+
+.card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 16px;
 }
 
-.outcome-code {
-  background: #e3f2fd;
-  color: #1976d2;
-  padding: 6px 16px;
-  border-radius: 8px;
+.lo-badge {
+  padding: 8px 16px;
+  border-radius: 10px;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
+  letter-spacing: 0.5px;
 }
 
-.outcome-actions {
+.card-actions {
   display: flex;
-  gap: 8px;
+  gap: 4px;
 }
 
-.btn-icon {
-  background: none;
+.action-btn {
+  width: 36px;
+  height: 36px;
   border: none;
-  font-size: 18px;
+  border-radius: 10px;
   cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s;
+  background: #f1f5f9;
+  color: #64748b;
 }
 
-.btn-icon:hover {
-  background: var(--bg-primary);
+.action-btn:hover {
+  transform: scale(1.1);
 }
 
-.outcome-description {
-  font-size: 16px;
-  line-height: 1.6;
-  color: var(--text-primary);
+.action-btn.edit:hover {
+  background: #dbeafe;
+  color: #3b82f6;
 }
 
-.no-data {
+.action-btn.delete:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.lo-description {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #475569;
+  margin: 0;
+}
+
+/* No Outcomes State */
+.no-outcomes {
   text-align: center;
-  padding: 40px;
-  color: var(--text-secondary);
-  font-style: italic;
+  padding: 60px 40px;
+}
+
+.no-outcomes-icon {
+  color: #cbd5e1;
+  margin-bottom: 20px;
+}
+
+.no-outcomes h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #334155;
+  margin: 0 0 8px 0;
+}
+
+.no-outcomes p {
+  font-size: 15px;
+  color: #64748b;
+  margin: 0 0 24px 0;
+}
+
+.btn-add-first {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+}
+
+.btn-add-first:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
 }
 
 /* Modal Styles */
@@ -325,7 +576,8 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -335,86 +587,163 @@ onMounted(() => {
 
 .modal-content {
   background: white;
-  border-radius: 16px;
-  max-width: 600px;
+  border-radius: 24px;
+  max-width: 560px;
   width: 100%;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+  animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--border-color);
+  padding: 24px 28px;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .modal-header h3 {
   margin: 0;
   font-size: 20px;
-  color: var(--text-primary);
+  font-weight: 700;
+  color: #1e293b;
 }
 
 .btn-close {
-  background: none;
+  width: 40px;
+  height: 40px;
+  background: #f1f5f9;
   border: none;
+  border-radius: 12px;
   font-size: 24px;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-close:hover {
+  background: #e2e8f0;
+  color: #334155;
 }
 
 .modal-body {
-  padding: 24px;
+  padding: 28px;
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 8px;
-  font-weight: 500;
-  color: var(--text-primary);
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: #334155;
+  font-size: 14px;
 }
 
 .form-input,
 .form-textarea {
   width: 100%;
-  padding: 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 16px;
+  padding: 14px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 15px;
   font-family: inherit;
-  transition: border-color 0.2s;
+  transition: all 0.2s;
+  background: #fafafa;
 }
 
 .form-input:focus,
 .form-textarea:focus {
   outline: none;
-  border-color: var(--primary-color);
+  border-color: #6366f1;
+  background: white;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 120px;
 }
 
 .modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 8px;
 }
 
 .btn-secondary {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  padding: 12px 24px;
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
+  padding: 14px 24px;
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  border-radius: 12px;
   font-weight: 600;
+  font-size: 15px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-secondary:hover {
-  background: var(--bg-secondary);
-  border-color: var(--primary-color);
+  background: #e2e8f0;
+}
+
+.btn-primary {
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .learning-outcomes-view {
+    padding: 20px;
+  }
+  
+  .page-header {
+    flex-direction: column;
+  }
+  
+  .header-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  
+  .select-input {
+    min-width: 100%;
+  }
+  
+  .outcomes-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
