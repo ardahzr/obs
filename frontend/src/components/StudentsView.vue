@@ -176,6 +176,14 @@
             </svg>
             {{ selectedStudentId === student.id ? 'Hide Scores' : 'View Scores' }}
           </button>
+          <button @click="downloadStudentReport(student.id)" class="btn-download-report" :disabled="downloadingReportId === student.id" title="Download Report">
+            <svg v-if="downloadingReportId !== student.id" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span v-else class="btn-spinner-small"></span>
+          </button>
         </div>
         
         <!-- PO Scores Section -->
@@ -188,6 +196,19 @@
               </svg>
               Program Outcome Scores
             </h4>
+            <div class="report-buttons">
+              <button @click="downloadStudentReport(student.id)" class="btn-report-small" :disabled="downloadingReportId === student.id">
+                📊 Full Report
+              </button>
+              <button 
+                v-if="selectedCourseId" 
+                @click="downloadStudentReport(student.id, selectedCourseId)" 
+                class="btn-report-small course-report"
+                :disabled="downloadingReportId === student.id"
+              >
+                📄 Course Report
+              </button>
+            </div>
           </div>
           <div class="scores-grid">
             <div v-for="score in poScores" :key="score.po_code" class="score-card">
@@ -411,6 +432,7 @@ const showAddModal = ref(false)
 const showImportModal = ref(false)
 const importing = ref(false)
 const importResult = ref(null)
+const downloadingReportId = ref(null)
 const importData = ref({
   file: null,
   courseId: null,
@@ -562,6 +584,45 @@ function getScoreGradient(score) {
   if (s >= 70) return 'linear-gradient(90deg, #10b981, #34d399)'
   if (s >= 50) return 'linear-gradient(90deg, #f59e0b, #fbbf24)'
   return 'linear-gradient(90deg, #ef4444, #f87171)'
+}
+
+async function downloadStudentReport(studentId, courseId = null) {
+  if (downloadingReportId.value) return
+  
+  downloadingReportId.value = studentId
+  try {
+    const response = await api.downloadStudentReport(studentId, courseId)
+    
+    // Find student for filename
+    const student = students.value.find(s => s.id === studentId)
+    const studentNo = student?.student_no || studentId
+    
+    // Create blob and download
+    const blob = new Blob([response.data], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    
+    // Set filename based on course filter
+    if (courseId) {
+      const course = courses.value.find(c => c.id === courseId)
+      link.setAttribute('download', `${studentNo}_${course?.code || 'course'}_report.xlsx`)
+    } else {
+      link.setAttribute('download', `${studentNo}_full_report.xlsx`)
+    }
+    
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Error downloading report:', error)
+    alert('Failed to download report. Please try again.')
+  } finally {
+    downloadingReportId.value = null
+  }
 }
 
 onMounted(() => {
@@ -1066,6 +1127,43 @@ onMounted(() => {
   color: white;
 }
 
+.btn-download-report {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-download-report:hover:not(:disabled) {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.btn-download-report:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-spinner-small {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #ddd;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* PO Scores Section */
 .po-scores-section {
   padding: 0 24px 24px;
@@ -1086,6 +1184,13 @@ onMounted(() => {
   }
 }
 
+.scores-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
 .scores-header h4 {
   display: flex;
   align-items: center;
@@ -1093,11 +1198,46 @@ onMounted(() => {
   font-size: 16px;
   font-weight: 700;
   color: #334155;
-  margin: 0 0 20px 0;
+  margin: 0;
 }
 
 .scores-header h4 svg {
   color: #10b981;
+}
+
+.report-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-report-small {
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-report-small:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-report-small:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-report-small.course-report {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.btn-report-small.course-report:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
 .scores-grid {

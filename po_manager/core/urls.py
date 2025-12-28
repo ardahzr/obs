@@ -32,4 +32,7 @@ urlpatterns = [
     path('courses/<int:course_id>/approve/', views.approve_course, name='approve_course'),
     path('courses/<int:course_id>/reject/', views.reject_course, name='reject_course'),
     path('pending-approvals/', views.get_pending_approvals, name='pending_approvals'),
+    # Report endpoints
+    path('reports/course/<int:course_id>/', views.generate_course_report, name='course_report'),
+    path('reports/student/<int:student_id>/', views.generate_student_report, name='student_report'),
 ]

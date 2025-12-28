@@ -8,7 +8,9 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 from django.utils import timezone
+from django.http import HttpResponse
 from collections import Counter
+import io
 
 from .models import (
     Course, ProgramOutcome, LearningOutcome, 
@@ -974,3 +976,469 @@ def import_obs_excel(request):
         'assessments_created': created_assessments,
         'grades_created': created_grades
     })
+
+
+# ============ REPORT GENERATION VIEWS ============
+
+@api_view(['GET'])
+def generate_course_report(request, course_id):
+    """
+    Kurs bazlı rapor oluştur - Excel formatında
+    Tüm öğrencilerin PO skorlarını ve assessment notlarını içerir
+    """
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return Response({'error': 'openpyxl kütüphanesi yüklü değil'}, status=500)
+    
+    try:
+        course = Course.objects.get(id=course_id)
+    except Course.DoesNotExist:
+        return Response({'error': 'Kurs bulunamadı'}, status=404)
+    
+    # Workbook oluştur
+    wb = openpyxl.Workbook()
+    
+    # ============ SHEET 1: Öğrenci PO Skorları ============
+    ws_po = wb.active
+    ws_po.title = "PO Scores"
+    
+    # Stiller
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="667eea", end_color="667eea", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # PO'ları al
+    pos = ProgramOutcome.objects.all().order_by('code')
+    
+    # Başlıkları yaz
+    headers = ['Student No', 'First Name', 'Last Name']
+    for po in pos:
+        headers.append(po.code)
+    headers.append('Average')
+    
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws_po.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+    
+    # Kursa kayıtlı öğrencileri al
+    enrollments = Enrollment.objects.filter(course=course).select_related('student', 'student__user')
+    
+    row_idx = 2
+    for enrollment in enrollments:
+        student = enrollment.student
+        
+        # Öğrenci bilgileri
+        ws_po.cell(row=row_idx, column=1, value=student.student_no).border = thin_border
+        ws_po.cell(row=row_idx, column=2, value=student.user.first_name).border = thin_border
+        ws_po.cell(row=row_idx, column=3, value=student.user.last_name).border = thin_border
+        
+        # PO skorlarını hesapla
+        po_scores = []
+        for col_idx, po in enumerate(pos, 4):
+            score = calculate_student_po_score(student, po, course)
+            cell = ws_po.cell(row=row_idx, column=col_idx, value=round(score, 2) if score else 0)
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal="center")
+            if score:
+                po_scores.append(score)
+        
+        # Ortalama
+        avg_score = sum(po_scores) / len(po_scores) if po_scores else 0
+        avg_cell = ws_po.cell(row=row_idx, column=len(headers), value=round(avg_score, 2))
+        avg_cell.border = thin_border
+        avg_cell.alignment = Alignment(horizontal="center")
+        avg_cell.font = Font(bold=True)
+        
+        row_idx += 1
+    
+    # Sütun genişliklerini ayarla
+    ws_po.column_dimensions['A'].width = 15
+    ws_po.column_dimensions['B'].width = 15
+    ws_po.column_dimensions['C'].width = 15
+    for i in range(4, len(headers) + 1):
+        ws_po.column_dimensions[get_column_letter(i)].width = 10
+    
+    # ============ SHEET 2: Assessment Notları ============
+    ws_grades = wb.create_sheet(title="Assessment Grades")
+    
+    # Assessmentları al
+    assessments = Assessment.objects.filter(course=course).order_by('date', 'name')
+    
+    # Başlıklar
+    grade_headers = ['Student No', 'First Name', 'Last Name']
+    for assessment in assessments:
+        grade_headers.append(f"{assessment.name} ({assessment.total_points})")
+    grade_headers.append('Total Points')
+    grade_headers.append('Percentage')
+    
+    for col_idx, header in enumerate(grade_headers, 1):
+        cell = ws_grades.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+    
+    row_idx = 2
+    for enrollment in enrollments:
+        student = enrollment.student
+        
+        ws_grades.cell(row=row_idx, column=1, value=student.student_no).border = thin_border
+        ws_grades.cell(row=row_idx, column=2, value=student.user.first_name).border = thin_border
+        ws_grades.cell(row=row_idx, column=3, value=student.user.last_name).border = thin_border
+        
+        total_points = 0
+        total_max = 0
+        
+        for col_idx, assessment in enumerate(assessments, 4):
+            try:
+                grade = Grade.objects.get(student=student, assessment=assessment)
+                points = grade.points
+            except Grade.DoesNotExist:
+                points = 0
+            
+            cell = ws_grades.cell(row=row_idx, column=col_idx, value=points)
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal="center")
+            
+            total_points += points
+            total_max += assessment.total_points
+        
+        # Toplam
+        total_cell = ws_grades.cell(row=row_idx, column=len(grade_headers) - 1, value=round(total_points, 2))
+        total_cell.border = thin_border
+        total_cell.font = Font(bold=True)
+        
+        # Yüzde
+        percentage = (total_points / total_max * 100) if total_max > 0 else 0
+        pct_cell = ws_grades.cell(row=row_idx, column=len(grade_headers), value=f"{round(percentage, 1)}%")
+        pct_cell.border = thin_border
+        pct_cell.font = Font(bold=True)
+        
+        row_idx += 1
+    
+    # Sütun genişliklerini ayarla
+    ws_grades.column_dimensions['A'].width = 15
+    ws_grades.column_dimensions['B'].width = 15
+    ws_grades.column_dimensions['C'].width = 15
+    
+    # ============ SHEET 3: LO-PO Mapping ============
+    ws_mapping = wb.create_sheet(title="LO-PO Mapping")
+    
+    los = LearningOutcome.objects.filter(course=course).order_by('code')
+    
+    # Başlıklar
+    mapping_headers = ['LO Code', 'LO Description']
+    for po in pos:
+        mapping_headers.append(po.code)
+    
+    for col_idx, header in enumerate(mapping_headers, 1):
+        cell = ws_mapping.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+    
+    row_idx = 2
+    for lo in los:
+        ws_mapping.cell(row=row_idx, column=1, value=lo.code).border = thin_border
+        ws_mapping.cell(row=row_idx, column=2, value=lo.description[:50]).border = thin_border
+        
+        for col_idx, po in enumerate(pos, 3):
+            try:
+                mapping = LoToPoMapping.objects.get(learning_outcome=lo, program_outcome=po)
+                weight = mapping.contribution_weight
+            except LoToPoMapping.DoesNotExist:
+                weight = ''
+            
+            cell = ws_mapping.cell(row=row_idx, column=col_idx, value=weight if weight else '')
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal="center")
+        
+        row_idx += 1
+    
+    ws_mapping.column_dimensions['A'].width = 12
+    ws_mapping.column_dimensions['B'].width = 50
+    
+    # ============ SHEET 4: Özet İstatistikler ============
+    ws_summary = wb.create_sheet(title="Summary")
+    
+    summary_data = [
+        ['Course Report Summary', ''],
+        ['', ''],
+        ['Course Code', course.code],
+        ['Course Name', course.name],
+        ['Semester', course.semester or 'N/A'],
+        ['Department', course.department],
+        ['', ''],
+        ['Statistics', ''],
+        ['Total Students', enrollments.count()],
+        ['Total Learning Outcomes', los.count()],
+        ['Total Assessments', assessments.count()],
+        ['Total LO-PO Mappings', LoToPoMapping.objects.filter(learning_outcome__course=course).count()],
+    ]
+    
+    for row_idx, row_data in enumerate(summary_data, 1):
+        for col_idx, value in enumerate(row_data, 1):
+            cell = ws_summary.cell(row=row_idx, column=col_idx, value=value)
+            if row_idx == 1 or row_idx == 8:
+                cell.font = Font(bold=True, size=14)
+            if col_idx == 1:
+                cell.font = Font(bold=True)
+    
+    ws_summary.column_dimensions['A'].width = 25
+    ws_summary.column_dimensions['B'].width = 40
+    
+    # Excel dosyasını response olarak dön
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    response = HttpResponse(
+        output.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{course.code}_report.xlsx"'
+    
+    return response
+
+
+@api_view(['GET'])
+def generate_student_report(request, student_id):
+    """
+    Öğrenci bazlı genel rapor - tüm dersler için PO skorları
+    """
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return Response({'error': 'openpyxl kütüphanesi yüklü değil'}, status=500)
+    
+    course_id = request.query_params.get('course_id')
+    
+    try:
+        student = Student.objects.get(id=student_id)
+    except Student.DoesNotExist:
+        return Response({'error': 'Öğrenci bulunamadı'}, status=404)
+    
+    wb = openpyxl.Workbook()
+    
+    # Stiller
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="667eea", end_color="667eea", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    if course_id:
+        # Belirli bir ders için rapor
+        try:
+            course = Course.objects.get(id=course_id)
+        except Course.DoesNotExist:
+            return Response({'error': 'Kurs bulunamadı'}, status=404)
+        
+        courses = [course]
+        filename = f"{student.student_no}_{course.code}_report.xlsx"
+    else:
+        # Tüm dersler için rapor
+        enrollments = Enrollment.objects.filter(student=student).select_related('course')
+        courses = [e.course for e in enrollments]
+        filename = f"{student.student_no}_full_report.xlsx"
+    
+    # ============ SHEET 1: Öğrenci Bilgileri ve Özet ============
+    ws_summary = wb.active
+    ws_summary.title = "Summary"
+    
+    summary_data = [
+        ['Student Report', ''],
+        ['', ''],
+        ['Student No', student.student_no],
+        ['First Name', student.user.first_name],
+        ['Last Name', student.user.last_name],
+        ['Department', student.department],
+        ['', ''],
+        ['Enrolled Courses', len(courses)],
+    ]
+    
+    for row_idx, row_data in enumerate(summary_data, 1):
+        for col_idx, value in enumerate(row_data, 1):
+            cell = ws_summary.cell(row=row_idx, column=col_idx, value=value)
+            if row_idx == 1:
+                cell.font = Font(bold=True, size=14)
+            if col_idx == 1:
+                cell.font = Font(bold=True)
+    
+    ws_summary.column_dimensions['A'].width = 20
+    ws_summary.column_dimensions['B'].width = 30
+    
+    # ============ SHEET 2: PO Skorları (Tüm Dersler) ============
+    ws_po = wb.create_sheet(title="PO Scores")
+    
+    pos = ProgramOutcome.objects.all().order_by('code')
+    
+    # Başlıklar
+    po_headers = ['Course']
+    for po in pos:
+        po_headers.append(po.code)
+    po_headers.append('Average')
+    
+    for col_idx, header in enumerate(po_headers, 1):
+        cell = ws_po.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+    
+    row_idx = 2
+    overall_po_scores = {po.id: [] for po in pos}
+    
+    for course in courses:
+        ws_po.cell(row=row_idx, column=1, value=f"{course.code}").border = thin_border
+        
+        course_scores = []
+        for col_idx, po in enumerate(pos, 2):
+            score = calculate_student_po_score(student, po, course)
+            cell = ws_po.cell(row=row_idx, column=col_idx, value=round(score, 2) if score else 0)
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal="center")
+            if score:
+                course_scores.append(score)
+                overall_po_scores[po.id].append(score)
+        
+        # Ders ortalaması
+        avg = sum(course_scores) / len(course_scores) if course_scores else 0
+        avg_cell = ws_po.cell(row=row_idx, column=len(po_headers), value=round(avg, 2))
+        avg_cell.border = thin_border
+        avg_cell.font = Font(bold=True)
+        
+        row_idx += 1
+    
+    # Genel ortalama satırı
+    if len(courses) > 1:
+        ws_po.cell(row=row_idx, column=1, value="OVERALL").border = thin_border
+        ws_po.cell(row=row_idx, column=1).font = Font(bold=True)
+        
+        all_scores = []
+        for col_idx, po in enumerate(pos, 2):
+            scores = overall_po_scores[po.id]
+            avg = sum(scores) / len(scores) if scores else 0
+            cell = ws_po.cell(row=row_idx, column=col_idx, value=round(avg, 2))
+            cell.border = thin_border
+            cell.font = Font(bold=True)
+            if avg:
+                all_scores.append(avg)
+        
+        overall_avg = sum(all_scores) / len(all_scores) if all_scores else 0
+        ws_po.cell(row=row_idx, column=len(po_headers), value=round(overall_avg, 2)).font = Font(bold=True, color="667eea")
+    
+    ws_po.column_dimensions['A'].width = 15
+    
+    # ============ SHEET 3: Assessment Detayları ============
+    ws_grades = wb.create_sheet(title="Assessment Details")
+    
+    grade_headers = ['Course', 'Assessment', 'Type', 'Max Points', 'Score', 'Percentage']
+    
+    for col_idx, header in enumerate(grade_headers, 1):
+        cell = ws_grades.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+    
+    row_idx = 2
+    for course in courses:
+        assessments = Assessment.objects.filter(course=course).order_by('date')
+        for assessment in assessments:
+            ws_grades.cell(row=row_idx, column=1, value=course.code).border = thin_border
+            ws_grades.cell(row=row_idx, column=2, value=assessment.name).border = thin_border
+            ws_grades.cell(row=row_idx, column=3, value=assessment.get_assessment_type_display()).border = thin_border
+            ws_grades.cell(row=row_idx, column=4, value=assessment.total_points).border = thin_border
+            
+            try:
+                grade = Grade.objects.get(student=student, assessment=assessment)
+                score = grade.points
+                percentage = grade.percentage
+            except Grade.DoesNotExist:
+                score = 0
+                percentage = 0
+            
+            ws_grades.cell(row=row_idx, column=5, value=score).border = thin_border
+            ws_grades.cell(row=row_idx, column=6, value=f"{round(percentage, 1)}%").border = thin_border
+            
+            row_idx += 1
+    
+    ws_grades.column_dimensions['A'].width = 12
+    ws_grades.column_dimensions['B'].width = 25
+    ws_grades.column_dimensions['C'].width = 12
+    ws_grades.column_dimensions['D'].width = 12
+    ws_grades.column_dimensions['E'].width = 10
+    ws_grades.column_dimensions['F'].width = 12
+    
+    # Excel dosyasını response olarak dön
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    response = HttpResponse(
+        output.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    return response
+
+
+def calculate_student_po_score(student, po, course=None):
+    """
+    Bir öğrencinin belirli bir PO için skorunu hesapla
+    Opsiyonel olarak belirli bir ders için filtreleme yapılabilir
+    """
+    lo_mappings = LoToPoMapping.objects.filter(program_outcome=po)
+    
+    if course:
+        lo_mappings = lo_mappings.filter(learning_outcome__course=course)
+    
+    total_weighted_score = 0
+    total_weight_sum = 0
+    
+    for lo_map in lo_mappings:
+        lo = lo_map.learning_outcome
+        lo_po_weight = lo_map.contribution_weight
+        
+        assess_mappings = AssessmentToLoMapping.objects.filter(learning_outcome=lo)
+        
+        for assess_map in assess_mappings:
+            assessment = assess_map.assessment
+            assess_lo_weight = assess_map.contribution_weight / 100  # Yüzdeden orana çevir
+            
+            try:
+                grade = Grade.objects.get(assessment=assessment, student=student)
+                score = grade.percentage
+                
+                contribution = score * assess_lo_weight * lo_po_weight
+                weight_factor = assess_lo_weight * lo_po_weight
+                
+                total_weighted_score += contribution
+                total_weight_sum += weight_factor
+            except Grade.DoesNotExist:
+                continue
+    
+    if total_weight_sum > 0:
+        return total_weighted_score / total_weight_sum
+    return 0

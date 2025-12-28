@@ -28,6 +28,11 @@
           </div>
         </div>
         <div class="course-actions">
+          <button @click="downloadReport" class="btn-report" :disabled="downloadingReport">
+            <span v-if="downloadingReport">⏳</span>
+            <span v-else>📊</span> 
+            {{ downloadingReport ? 'Generating...' : 'Download Report' }}
+          </button>
           <button @click="$emit('openEditor', course.id)" class="btn-primary">
             <span>🔗</span> Edit LO-PO Mappings
           </button>
@@ -220,6 +225,7 @@ const programOutcomes = ref([])
 const assessments = ref([])
 const mappings = ref([])
 const assessmentMappings = ref([])
+const downloadingReport = ref(false)
 
 const mappedPOCount = computed(() => {
   const mappedPOs = new Set(mappings.value.map(m => m.program_outcome))
@@ -359,6 +365,33 @@ async function loadCourseData() {
 onMounted(() => {
   loadCourseData()
 })
+
+async function downloadReport() {
+  if (downloadingReport.value) return
+  
+  downloadingReport.value = true
+  try {
+    const response = await api.downloadCourseReport(props.courseId)
+    
+    // Create blob and download
+    const blob = new Blob([response.data], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `${course.value?.code || 'course'}_report.xlsx`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Error downloading report:', error)
+    alert('Failed to download report. Please try again.')
+  } finally {
+    downloadingReport.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -433,6 +466,35 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   font-size: 14px;
+}
+
+.course-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.course-actions .btn-report {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.course-actions .btn-report:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: white;
+}
+
+.course-actions .btn-report:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .course-actions .btn-primary {

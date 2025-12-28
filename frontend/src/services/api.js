@@ -229,6 +229,30 @@ export default {
     })
   },
 
+  // Reports
+  downloadCourseReport(courseId) {
+    const token = localStorage.getItem('token')
+    return api.get(`reports/course/${courseId}/`, {
+      responseType: 'blob',
+      headers: {
+        Authorization: `Token ${token}`
+      }
+    })
+  },
+  downloadStudentReport(studentId, courseId = null) {
+    const token = localStorage.getItem('token')
+    let url = `reports/student/${studentId}/`
+    if (courseId) {
+      url += `?course_id=${courseId}`
+    }
+    return api.get(url, {
+      responseType: 'blob',
+      headers: {
+        Authorization: `Token ${token}`
+      }
+    })
+  },
+
   // Raw axios methods for flexibility
   post(url, data, config) {
     return api.post(url, data, config)
