@@ -21,6 +21,7 @@ from .serializers import (
     LoginSerializer, RegisterSerializer, UserSerializer, NotificationSerializer
 )
 from .chat_utils import chat_with_gemini
+from .email_utils import send_notification_email
 
 
 # Create your views here.
@@ -32,9 +33,46 @@ def test_api(request):
 
 # ============ AUTH VIEWS ============
 
+import requests as http_requests
+from django.conf import settings as django_settings
+
+def verify_recaptcha(token):
+    """Verify reCAPTCHA token with Google"""
+    if not token:
+        return False
+    
+    secret_key = django_settings.RECAPTCHA_SECRET_KEY
+    if not secret_key:
+        # If no secret key configured, skip verification (development mode)
+        return True
+    
+    try:
+        response = http_requests.post(
+            'https://www.google.com/recaptcha/api/siteverify',
+            data={
+                'secret': secret_key,
+                'response': token
+            },
+            timeout=5
+        )
+        result = response.json()
+        return result.get('success', False)
+    except Exception as e:
+        print(f"reCAPTCHA verification error: {e}")
+        return False
+
+
 @api_view(['POST'])
 def login_view(request):
     """User login"""
+    # Verify reCAPTCHA
+    recaptcha_token = request.data.get('recaptcha_token')
+    if not verify_recaptcha(recaptcha_token):
+        return Response({
+            'success': False,
+            'message': 'reCAPTCHA doğrulaması başarısız. Lütfen tekrar deneyin.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.validated_data['user']
@@ -413,13 +451,15 @@ def submit_course_for_approval(request, course_id):
         # Send notification to all admin users
         admins = User.objects.filter(profile__user_type='admin')
         for admin in admins:
-            Notification.objects.create(
+            notification = Notification.objects.create(
                 recipient=admin,
                 sender=user,
                 course=course,
                 notification_type='approval_request',
                 message=f'{user.get_full_name() or user.username} submitted "{course.code} - {course.name}" for your approval.'
             )
+            # Send email notification
+            send_notification_email(notification)
         
         return Response({
             'success': True, 
@@ -484,13 +524,15 @@ def approve_course(request, course_id):
         
         # Send notification to course owner
         if course.instructor:
-            Notification.objects.create(
+            notification = Notification.objects.create(
                 recipient=course.instructor,
                 sender=user,
                 course=course,
                 notification_type='approved',
                 message=f'"{course.code} - {course.name}" has been approved. {message}'
             )
+            # Send email notification
+            send_notification_email(notification)
         
         return Response({
             'success': True,
@@ -534,13 +576,15 @@ def reject_course(request, course_id):
         
         # Send notification to course owner
         if course.instructor:
-            Notification.objects.create(
+            notification = Notification.objects.create(
                 recipient=course.instructor,
                 sender=user,
                 course=course,
                 notification_type='rejected',
                 message=f'"{course.code} - {course.name}" has been rejected. Reason: {reason}'
             )
+            # Send email notification
+            send_notification_email(notification)
         
         return Response({
             'success': True,
